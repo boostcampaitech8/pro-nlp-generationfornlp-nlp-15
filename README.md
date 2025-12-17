@@ -3,22 +3,25 @@
 ---
 
 ## 📂 프로젝트 폴더 구조 (Project Structure)
-
 koreasat_project/
 ├── configs/
-│ └── train_config.yaml # 모델, LoRA, 학습 하이퍼파라미터 통합 관리
+│   └── train_config.yaml        # 모델, LoRA, 학습 하이퍼파라미터 통합 관리
+│
 ├── data/
-│ ├── train.csv # 학습용 데이터 (id, paragraph, problems 컬럼)
-│ └── test.csv # 추론용 데이터 (id, paragraph, problems 컬럼)
-├── outputs/ # 학습된 체크포인트 및 최종 모델(Adapter) 저장
-│ └── final_adapter/ # 학습 완료 후 생성되는 최종 LoRA 가중치 및 설정
-├── data_utils.py # 데이터 로드, literal_eval 파싱, 동적 프롬프트 생성 로직
-├── model_utils.py # 모델/토크나이저 로드, Chat Template 및 프롬프트 상수 관리
-├── trainer.py # SFTTrainer 실행 및 Completion Only 학습 설정
-├── metrics.py # Logit 비교 기반 정답 토큰 정확도(Accuracy) 계산
-├── main.py # 학습 실행 엔트리 포인트
-├── inference.py # 추론 실행 및 output.csv 생성
-└── requirements.txt # 필수 라이브러리 목록
+│   ├── train.csv                # 학습용 데이터 (id, paragraph, problems)
+│   └── test.csv                 # 추론용 데이터 (id, paragraph, problems)
+│
+├── outputs/
+│   └── final_adapter/           # 학습 완료 후 생성되는 최종 LoRA 가중치 및 설정
+│
+├── data_utils.py                # 데이터 로드, literal_eval 파싱, 동적 프롬프트 생성
+├── model_utils.py               # 모델/토크나이저 로드, Chat Template, 프롬프트 상수
+├── trainer.py                   # SFTTrainer 실행, Completion Only 학습 설정
+├── metrics.py                   # Logit 비교 기반 정답 토큰 Accuracy 계산
+├── main.py                      # 학습 실행 엔트리 포인트
+├── inference.py                 # 추론 실행 및 output.csv 생성
+└── requirements.txt             # 필수 라이브러리 목록
+
 
 ---
 
@@ -89,7 +92,7 @@ koreasat_project/
 #### `data/`
 - 원본 데이터 저장 디렉토리
 - `literal_eval` 기반 파싱을 사용하므로  
-  홑따옴표(`'`)가 포함된 파이썬 딕셔너리 형태도 문제없이 처리 가능
+  홑따옴표(`'`)가 포함된 파이썬 딕셔너리 형태도 처리 가능
 
 ---
 
