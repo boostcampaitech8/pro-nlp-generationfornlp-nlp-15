@@ -11,7 +11,7 @@ def run_inference():
         config = yaml.safe_load(f)
     
     # 1. 모델 로드 
-    model, tokenizer = load_model_and_tokenizer(config, is_train=False)
+    model, tokenizer, _ = load_model_and_tokenizer(config, is_train=False)
     model.eval()
 
     # 2. 데이터 로드
@@ -42,7 +42,7 @@ def run_inference():
                 messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"
             ).to("cuda")
 
-            logits = model(input_ids).logits[:, -1, :].flatten().cpu()
+            logits = model(input_ids).logits[:, -1, :].flatten().float().cpu()
             
             # 선택지에 해당하는 토큰 점수만 추출
             target_ids = [tokenizer.vocab[str(i + 1)] for i in range(len(p["choices"]))]
@@ -55,4 +55,5 @@ def run_inference():
     print("Inference Complete!")
 
 if __name__ == "__main__":
+
     run_inference()
