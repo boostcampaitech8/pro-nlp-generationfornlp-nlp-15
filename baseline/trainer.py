@@ -1,7 +1,6 @@
-# src/trainer.py
 import os
 import torch
-from trl import SFTTrainer, SFTConfig, DataCollatorForCompletionOnlyLM # 추가됨
+from trl import SFTTrainer, SFTConfig
 
 def run_training(model, tokenizer, train_dataset, val_dataset, config, metrics_obj=None, peft_config=None):
     
@@ -23,16 +22,6 @@ def run_training(model, tokenizer, train_dataset, val_dataset, config, metrics_o
     train_conf = config['training']
     data_conf = config['data']
 
-    # 3. Data Collator 설정 (CompletionOnlyLM 적용)
-    # 질문(Prompt) 부분은 마스킹하고, 답변(Response) 부분만 학습합니다.
-    response_template = "<start_of_turn>model" # Gemma 모델 기준
-    
-    print(f"Using DataCollatorForCompletionOnlyLM with template: '{response_template}'")
-    data_collator = DataCollatorForCompletionOnlyLM(
-        response_template=response_template,
-        tokenizer=tokenizer,
-    )
-
     # 4. SFTConfig 설정
     sft_config = SFTConfig(
         output_dir=train_conf.get('output_dir', './outputs'),
@@ -50,14 +39,15 @@ def run_training(model, tokenizer, train_dataset, val_dataset, config, metrics_o
         # 로깅 및 저장 전략 (YAML 값 우선, 없으면 에폭 단위)
         logging_steps=train_conf.get('logging_steps', 1),
         save_strategy=train_conf.get('save_strategy', 'epoch'),
-        evaluation_strategy=train_conf.get('evaluation_strategy', 'epoch'),
+        eval_strategy=train_conf.get('evaluation_strategy', 'epoch'),
         save_total_limit=train_conf.get('save_total_limit', 2),
         save_only_model=True,
         bf16=train_conf.get('bf16', True), 
         #tf32=train_conf.get('tf32', True),
         gradient_checkpointing=train_conf.get('gradient_checkpointing', True),
-        max_seq_length=data_conf.get('max_seq_length', 1024),
+        max_length=data_conf.get('max_seq_length', 1024),
         dataset_kwargs={"skip_prepare_dataset": True}, 
+        completion_only_loss=True, 
         report_to="wandb" if train_conf.get('report_to') != "none" else "none",
         run_name=wandb_conf.get('name', 'gemma-train-run'),
     )
@@ -67,8 +57,7 @@ def run_training(model, tokenizer, train_dataset, val_dataset, config, metrics_o
         model=model,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
-        data_collator=data_collator, # CompletionOnlyLM Collator
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         
         # Metrics 클래스에서 메서드 연결
         compute_metrics=metrics_obj.compute_metrics if metrics_obj else None,
