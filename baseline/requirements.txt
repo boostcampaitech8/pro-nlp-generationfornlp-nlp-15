@@ -1,7 +1,7 @@
 ipykernel==6.29.5
 ipywidgets==8.1.5
 transformers==4.46
-trl==0.12.2
+trl==0.26
 scikit-learn==1.5.2
 matplotlib==3.9.2
 evaluate==0.4.3
