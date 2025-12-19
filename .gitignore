@@ -1,6 +1,10 @@
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,linux,windows,macos,git
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python,linux,windows,macos,git
 
+# 프로젝트 진행하면서 무시해야할 파일 구조
+data/
+uv.lock
+
 ### Git ###
 # Created by git for backups. To disable backups in Git:
 # $ git config --global mergetool.keepBackup false

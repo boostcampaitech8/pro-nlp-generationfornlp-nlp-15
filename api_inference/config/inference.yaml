@@ -1,0 +1,21 @@
+# API Inference Configuration
+# OpenAPI 호환 서버용 추론 설정 파일
+
+api:
+  base_url: "http://10.28.228.126:30372/v1"  # OpenAPI 호환 서버 URL (수정 가능)
+  api_key: "EMPTY"                       # API 키 (로컬 서버의 경우 EMPTY)
+  model_name: "local_model"              # 모델 이름
+  timeout: 120                           # 요청 타임아웃 (초)
+  max_retries: 3                         # 최대 재시도 횟수
+
+data:
+  test_path: "data/test.csv"             # 테스트 데이터 경로
+  output_dir: "data"                     # 출력 디렉토리
+
+inference:
+  temperature: 0.6                       # 생성 온도 (0.0 = deterministic)
+  max_tokens: 1024                       # 최대 생성 토큰 수
+  system_prompt: "지문을 읽고 내용을 정리하시오. 각 선지별로 정답을 선택하기 위한 근거를 서술한 후 최종적으로 답변을 제시하시오, 정답을 제출할때는 정답: 숫자 형식으로 답변하시오"  # 시스템 프롬프트
+  max_concurrent: 40                     # 동시 요청 수 (병렬 처리)
+  tool_choice: "auto"                    # Function call 선택 방식 (vLLM Hermes: "auto" 권장)
+
