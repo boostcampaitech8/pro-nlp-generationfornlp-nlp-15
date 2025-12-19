@@ -56,8 +56,7 @@ tensorboard/
 # .cache/torch/
 
 # === Data (project-specific) ===
-data/
-**/data/
+.data
 *.csv
 *.json
 *.pkl
