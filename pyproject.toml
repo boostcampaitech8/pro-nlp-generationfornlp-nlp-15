@@ -1,0 +1,30 @@
+[project]
+name = "pro-nlp-generationfornlp-nlp-15"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "accelerate==1.12.0",
+    "bitsandbytes==0.49.0",
+    "datasets==4.4.1",
+    "evaluate==0.4.3",
+    "matplotlib==3.9.2",
+    "numpy==1.26.4",
+    "pandas==2.3.3",
+    "peft==0.13.2",
+    "requests==2.32.5",
+    "scikit-learn==1.5.2",
+    "torch==2.9.1",
+    "tqdm==4.67.1",
+    "transformers==4.57.3",
+    "trl==0.26.1",
+    "wandb>=0.23.1",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "ipywidgets>=8.1.8",
+    "jupyterlab-widgets>=3.0.16",
+]
