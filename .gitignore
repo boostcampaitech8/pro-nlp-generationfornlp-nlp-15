@@ -2,6 +2,8 @@
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python,linux,windows,macos,git
 
 # 프로젝트 진행하면서 무시해야할 파일 구조
+# data: symbolic link 용
+data 
 data/
 uv.lock
 
@@ -286,3 +288,4 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,linux,windows,macos,git
+
