@@ -15,7 +15,10 @@ import yaml
 from tqdm.asyncio import tqdm_asyncio
 
 from .utils.api_client import AsyncAPIClient
-from .utils.data_loader import load_test_data, format_question_message, create_messages
+from .utils.data_loader import (
+    load_test_data, format_question_message, create_messages,
+    QuestionType, SYSTEM_PROMPTS, get_question_type_stats
+)
 from .utils.output_handler import save_results_with_raw
 
 # 최대 재시도 횟수
@@ -78,7 +81,8 @@ async def process_single_item(
     client: AsyncAPIClient,
     item: dict,
     system_prompt: str,
-    semaphore: asyncio.Semaphore
+    semaphore: asyncio.Semaphore,
+    use_type_specific_prompt: bool = True
 ) -> dict:
     """
     단일 문제 처리 (비동기) - 파싱 실패 시 자동 재시도
@@ -86,23 +90,31 @@ async def process_single_item(
     Args:
         client: 비동기 API 클라이언트
         item: 테스트 데이터 항목
-        system_prompt: 시스템 프롬프트
+        system_prompt: 시스템 프롬프트 (use_type_specific_prompt=False일 때 사용)
         semaphore: 동시 요청 제한용 세마포어
+        use_type_specific_prompt: 문제 유형별 프롬프트 사용 여부
     
     Returns:
-        결과 딕셔너리 {'id': ..., 'answer': ..., 'raw_response': ...}
+        결과 딕셔너리 {'id': ..., 'answer': ..., 'raw_response': ..., 'question_type': ...}
     """
     async with semaphore:
-        # 프롬프트 생성
+        # 문제 유형 가져오기
+        question_type = item.get('question_type', QuestionType.DEFAULT)
+        
+        # 프롬프트 생성 (유형별 또는 기본)
         user_message = format_question_message(
             paragraph=item['paragraph'],
             question=item['question'],
             question_plus=item['question_plus'],
-            choices_list=item['choices']
+            choices_list=item['choices'],
+            question_type=question_type if use_type_specific_prompt else QuestionType.DEFAULT
         )
         
-        # 메시지 구성
-        messages = create_messages(user_message, system_prompt)
+        # 메시지 구성 (유형별 시스템 프롬프트 또는 기본)
+        if use_type_specific_prompt:
+            messages = create_messages(user_message, question_type=question_type)
+        else:
+            messages = create_messages(user_message, system_prompt)
         
         raw_response = ""
         answer = "0"
@@ -133,7 +145,8 @@ async def process_single_item(
         return {
             "id": item['id'],
             "answer": answer,
-            "raw_response": raw_response
+            "raw_response": raw_response,
+            "question_type": question_type.value
         }
 
 
@@ -157,7 +170,17 @@ async def run_api_inference_async(config_path: str) -> tuple:
     # 테스트 데이터 로드
     test_data = load_test_data(config['data']['test_path'])
     
-    # 시스템 프롬프트
+    # 문제 유형별 통계 출력
+    type_stats = get_question_type_stats(test_data)
+    print("=== 문제 유형별 통계 ===")
+    for qtype, count in type_stats.items():
+        print(f"  {qtype}: {count}개")
+    print("========================")
+    
+    # 유형별 프롬프트 사용 여부
+    use_type_specific_prompt = config['inference'].get('use_type_specific_prompt', True)
+    
+    # 시스템 프롬프트 (유형별 프롬프트 미사용 시에만 적용)
     system_prompt = config['inference'].get(
         'system_prompt'
     )
@@ -166,11 +189,11 @@ async def run_api_inference_async(config_path: str) -> tuple:
     max_concurrent = config['inference'].get('max_concurrent', 40)
     semaphore = asyncio.Semaphore(max_concurrent)
     
-    print(f"Starting API Inference (max_concurrent={max_concurrent}, max_retry={MAX_RETRY})...")
+    print(f"Starting API Inference (max_concurrent={max_concurrent}, max_retry={MAX_RETRY}, use_type_specific_prompt={use_type_specific_prompt})...")
     
     # 모든 태스크 생성
     tasks = [
-        process_single_item(client, item, system_prompt, semaphore)
+        process_single_item(client, item, system_prompt, semaphore, use_type_specific_prompt)
         for item in test_data
     ]
     

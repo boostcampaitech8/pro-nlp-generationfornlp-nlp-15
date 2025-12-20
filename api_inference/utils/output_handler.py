@@ -66,10 +66,10 @@ def save_results_with_raw(
     """
     추론 결과를 두 개의 CSV 파일로 저장
     - output_시간.csv: id, answer만 포함
-    - output_raw_시간.csv: id, answer, raw_response 포함
+    - output_raw_시간.csv: id, answer, question_type, raw_response 포함
     
     Args:
-        results: 결과 리스트 [{'id': ..., 'answer': ..., 'raw_response': ...}, ...]
+        results: 결과 리스트 [{'id': ..., 'answer': ..., 'raw_response': ..., 'question_type': ...}, ...]
         output_dir: 출력 디렉토리
     
     Returns:
@@ -88,9 +88,14 @@ def save_results_with_raw(
     df_output = pd.DataFrame(results)[['id', 'answer']]
     df_output.to_csv(output_path, index=False)
     
-    # output_raw.csv 저장 (id, answer, raw_response)
+    # output_raw.csv 저장 (id, answer, question_type, raw_response)
     df_raw = pd.DataFrame(results)
-    df_raw.to_csv(raw_output_path, index=False)
+    
+    # 필요한 컬럼만 선택
+    available_columns = ['id', 'answer', 'question_type', 'raw_response']
+    df_raw = df_raw[[col for col in available_columns if col in df_raw.columns]]
+    
+    df_raw.to_csv(raw_output_path, index=False, encoding='utf-8-sig')
     
     return output_path, raw_output_path
 
