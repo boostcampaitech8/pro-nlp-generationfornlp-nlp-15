@@ -25,7 +25,7 @@ class SFTTrainingRunner:
         peft_config: Any | None = None,
         metrics: Any | None = None,
     ) -> None:
-        if config.training is None:
+        if config.train is None:
             raise ValueError("config.training is required for training")
 
         self.config = config
@@ -39,8 +39,8 @@ class SFTTrainingRunner:
         self._trainer: SFTTrainer | None = None
 
     def build_sft_config(self) -> SFTConfig:
-        train = self.config.training
-        data = self.config.data
+        train = self.config.train
+        tokenizer = self.config.tokenizer
 
         report_to = "wandb" if train.report_to == "wandb" else "none"
         run_name = self.config.wandb.name if self.config.wandb else None
@@ -64,7 +64,7 @@ class SFTTrainingRunner:
             bf16=train.bf16,
             tf32=train.tf32,
             gradient_checkpointing=train.gradient_checkpointing,
-            max_length=data.max_seq_length,
+            max_length=tokenizer.max_seq_length,
             dataset_kwargs={"skip_prepare_dataset": True},
             completion_only_loss=True,
             report_to=report_to,
@@ -105,7 +105,7 @@ class SFTTrainingRunner:
         trainer.train()
 
     def save_final(self, *, subdir: str = "final_adapter") -> Path:
-        train = self.config.training
+        train = self.config.train
         out_dir = Path(train.output_dir) / subdir
         out_dir.mkdir(parents=True, exist_ok=True)
 

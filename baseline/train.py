@@ -11,7 +11,7 @@ from .trainer.sft_runner import SFTTrainingRunner
 
 from common.utils.logger import setup_logging
 from common.utils.wandb import set_wandb_env
-from common.data.load_dataset import load_sft_datasets
+from common.data.load_dataset import load_tokenized_qa_dataset
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -26,7 +26,7 @@ def main() -> None:
     config = load_config(args.config)
 
     # 2) logging (실험 output_dir/logs/train.log)
-    setup_logging(Path(config.training.output_dir))
+    setup_logging(Path(config.train.output_dir))
     log = logging.getLogger(__name__)
     log.info("Loaded config: %s", args.config)
 
@@ -45,14 +45,18 @@ def main() -> None:
 
     # 5) dataset (single CSV -> train/val split)
     log.info("Building datasets...")
-    train_ds, val_ds = load_sft_datasets(
-        file_path=str(config.data.train_path),
+    ds = load_tokenized_qa_dataset(
+        file_path=str(config.train.train_path),
         tokenizer=tokenizer,
-        max_length=config.data.max_seq_length,
-        split_ratio=0.1,  # 필요하면 config에 추가해도 됨
-        seed=config.training.seed,
+        max_length=config.tokenizer.max_seq_length,
         require_answer=True,
     )
+    split = ds.train_test_split(
+        test_size=0.1,
+        seed=config.train.seed,
+    )
+    train_ds = split["train"]
+    val_ds = split["test"]
     log.info("Dataset sizes: train=%d val=%d", len(train_ds), len(val_ds))
 
     # 6) metrics

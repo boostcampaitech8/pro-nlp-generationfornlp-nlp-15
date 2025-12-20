@@ -27,10 +27,10 @@ GEMMA_CHAT_TEMPLATE = (
 
 
 def _resolve_torch_dtype(cfg: Config) -> torch.dtype:
-    if cfg.training is not None:
-        if cfg.training.bf16:
+    if cfg.train is not None:
+        if cfg.train.bf16:
             return torch.bfloat16
-        if cfg.training.fp16:
+        if cfg.train.fp16:
             return torch.float16
     return torch.float32
 
@@ -39,13 +39,14 @@ def _load_tokenizer(
     model_name_or_path: str,
     *,
     max_seq_length: int,
-    padding_side: str,
 ) -> PreTrainedTokenizerBase:
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
     tokenizer.chat_template = GEMMA_CHAT_TEMPLATE
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = padding_side
+    if not tokenizer.pad_token:
+        tokenizer.pad_token = tokenizer.eos_token
+        
+    tokenizer.padding_side = "right"
     tokenizer.model_max_length = max_seq_length
 
     return tokenizer
@@ -67,17 +68,15 @@ def load_for_train(
     config: Config,
 ) -> tuple[AutoModelForCausalLM, PreTrainedTokenizerBase]:
     """
-    Load model + tokenizer for training (LoRA applied).
+    Load model + tokenizer for train (LoRA applied).
     """
-    assert config.training is not None, "TrainingConfig required for training"
-    assert config.lora is not None, "LoRAConfig required for training"
+    assert config.train is not None, "trainConfig required for train"
 
     torch_dtype = _resolve_torch_dtype(config)
 
     tokenizer = _load_tokenizer(
         config.model.name_or_path,
         max_seq_length=config.tokenizer.max_seq_length,
-        padding_side=config.tokenizer.padding_side,
     )
 
     model = _load_base_model(
@@ -85,21 +84,21 @@ def load_for_train(
         torch_dtype=torch_dtype,
     )
 
-    if config.training.gradient_checkpointing:
+    if config.train.gradient_checkpointing:
         model.gradient_checkpointing_enable()
         model.enable_input_require_grads()
 
     lora_cfg = LoraConfig(
-        r=config.lora.r,
-        lora_alpha=config.lora.lora_alpha,
-        lora_dropout=config.lora.lora_dropout,
-        target_modules=config.lora.target_modules,
-        bias=config.lora.bias,
-        task_type=config.lora.task_type,
+        r=config.train.lora_r,
+        lora_alpha=config.train.lora_alpha,
+        lora_dropout=config.train.lora_dropout,
+        target_modules=config.train.lora_target_modules,
+        bias="none",    
+        task_type="CAUSAL_LM",
     )
 
     model = get_peft_model(model, lora_cfg)
-    return model, tokenizer
+    return model, tokenizer, lora_cfg
 
 
 def load_for_infer(
@@ -110,15 +109,16 @@ def load_for_infer(
     """
     Load model + tokenizer for inference.
     """
+    torch_dtype = _resolve_torch_dtype(config)
+    
     tokenizer = _load_tokenizer(
         config.model.name_or_path,
         max_seq_length=config.tokenizer.max_seq_length,
-        padding_side=config.tokenizer.padding_side,
     )
 
     model = _load_base_model(
         config.model.name_or_path,
-        torch_dtype=torch.bfloat16,
+        torch_dtype=torch_dtype,
     )
 
     if adapter_path is not None:
