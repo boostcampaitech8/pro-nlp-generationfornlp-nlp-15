@@ -17,15 +17,6 @@ from peft import (
 from ..configs.schema import Config
 
 
-GEMMA_CHAT_TEMPLATE = (
-    "{% if messages[0]['role'] == 'system' %}{% set system_message = messages[0]['content'] %}{% endif %}"
-    "{% if system_message is defined %}{{ system_message }}{% endif %}"
-    "{% for message in messages %}{% set content = message['content'] %}"
-    "{% if message['role'] == 'user' %}{{ '<start_of_turn>user\n' + content + '<end_of_turn>\n<start_of_turn>model\n' }}"
-    "{% elif message['role'] == 'assistant' %}{{ content + '<end_of_turn>\n' }}{% endif %}{% endfor %}"
-)
-
-
 def _resolve_torch_dtype(cfg: Config) -> torch.dtype:
     if cfg.train is not None:
         if cfg.train.bf16:
@@ -38,15 +29,12 @@ def _resolve_torch_dtype(cfg: Config) -> torch.dtype:
 def _load_tokenizer(
     model_name_or_path: str,
     *,
+    padding_side:  str,
     max_seq_length: int,
 ) -> PreTrainedTokenizerBase:
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
-    tokenizer.chat_template = GEMMA_CHAT_TEMPLATE
-    if not tokenizer.pad_token:
-        tokenizer.pad_token = tokenizer.eos_token
-        
-    tokenizer.padding_side = "right"
+    tokenizer.padding_side = padding_side
     tokenizer.model_max_length = max_seq_length
 
     return tokenizer
@@ -76,6 +64,7 @@ def load_for_train(
 
     tokenizer = _load_tokenizer(
         config.model.name_or_path,
+        padding_side=config.tokenizer.padding_side,
         max_seq_length=config.tokenizer.max_seq_length,
     )
 
@@ -113,6 +102,7 @@ def load_for_infer(
     
     tokenizer = _load_tokenizer(
         config.model.name_or_path,
+        padding_side=config.tokenizer.padding_side,
         max_seq_length=config.tokenizer.max_seq_length,
     )
 

@@ -19,6 +19,22 @@ def load_tokenized_qa_dataset(
     require_answer: bool = True,
 ) -> Dataset:
     
+    dataset = load_qa_dataset(file_path, require_answer=require_answer)
+    
+    logger.info("[SFTDataLoader] Tokenizing")
+    tokenized = tokenize_chat_dataset(dataset, tokenizer)
+
+    if filter_by_max_length:
+        logger.info(f"[SFTDataLoader] Filtering samples > {max_length} tokens")
+        tokenized = filter_by_max_length(tokenized, max_length)
+
+    return tokenized
+
+
+def load_qa_dataset(
+    file_path: str,
+    require_answer: bool = True,
+):
     logger.info("[SFTDataLoader] Loading QA examples")
     examples = load_qa_examples_from_csv(file_path)
 
@@ -29,14 +45,8 @@ def load_tokenized_qa_dataset(
     formatted: list[dict[str, list[dict[str, str]]]] = [
         build_chat_messages(example) for example in examples
     ]
-
+    
     dataset = Dataset.from_list(formatted)
 
-    logger.info("[SFTDataLoader] Tokenizing")
-    tokenized = tokenize_chat_dataset(dataset, tokenizer)
-
-    if filter_by_max_length:
-        logger.info(f"[SFTDataLoader] Filtering samples > {max_length} tokens")
-        tokenized = filter_by_max_length(tokenized, max_length)
-
-    return tokenized
+    return dataset
+    
