@@ -43,4 +43,4 @@ infer:
 wandb:
   project: "koreasat_woohyun"
   entity: "hakiful-ai"
-  name: "beomi/gemma-ko-2b-joonbaseline"
+  name: "beomi/gemma-ko-2b-joonbaseline-fix"

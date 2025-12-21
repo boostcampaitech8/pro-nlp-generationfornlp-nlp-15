@@ -45,6 +45,10 @@ class SFTTrainingRunner:
         report_to = "wandb" if train.report_to == "wandb" else "none"
         run_name = self.config.wandb.name if self.config.wandb else None
 
+        # response_template: 이 토큰 이후부터가 completion(정답)
+        # TRL이 자동으로 이 토큰 이전의 labels를 -100으로 마스킹
+        response_template = "<start_of_turn>model\n"
+
         return SFTConfig(
             output_dir=str(train.output_dir),
             do_train=True,
@@ -64,9 +68,9 @@ class SFTTrainingRunner:
             bf16=train.bf16,
             tf32=train.tf32,
             gradient_checkpointing=train.gradient_checkpointing,
-            max_length=tokenizer.max_seq_length,
-            dataset_kwargs={"skip_prepare_dataset": True},
-            completion_only_loss=True,
+            max_seq_length=tokenizer.max_seq_length,
+            dataset_text_field="text",
+            response_template=response_template,
             report_to=report_to,
             run_name=run_name,
             save_only_model=True,

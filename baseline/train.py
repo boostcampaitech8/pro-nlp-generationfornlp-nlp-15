@@ -10,7 +10,7 @@ from .trainer.sft_runner import SFTTrainingRunner
 
 from common.utils.logger import setup_logging
 from common.utils.wandb import set_wandb_env
-from common.data.load_dataset import load_tokenized_qa_dataset
+from common.data.load_dataset import load_text_qa_dataset
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,10 +46,9 @@ def main() -> None:
 
     # 5) dataset (single CSV -> train/val split)
     log.info("Building datasets...")
-    ds = load_tokenized_qa_dataset(
+    ds = load_text_qa_dataset(
         file_path=str(config.train.train_path),
         tokenizer=tokenizer,
-        max_length=config.tokenizer.max_seq_length,
         require_answer=True,
     )
     split = ds.train_test_split(
