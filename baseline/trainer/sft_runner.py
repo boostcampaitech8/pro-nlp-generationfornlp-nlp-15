@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from trl import SFTConfig, SFTTrainer
+from trl import SFTConfig, SFTTrainer, DataCollatorForCompletionOnlyLM
 from transformers import PreTrainedTokenizerBase
 from transformers.modeling_utils import PreTrainedModel
 
@@ -45,10 +45,6 @@ class SFTTrainingRunner:
         report_to = "wandb" if train.report_to == "wandb" else "none"
         run_name = self.config.wandb.name if self.config.wandb else None
 
-        # response_template: 이 토큰 이후부터가 completion(정답)
-        # TRL이 자동으로 이 토큰 이전의 labels를 -100으로 마스킹
-        response_template = "<start_of_turn>model\n"
-
         return SFTConfig(
             output_dir=str(train.output_dir),
             do_train=True,
@@ -70,7 +66,6 @@ class SFTTrainingRunner:
             gradient_checkpointing=train.gradient_checkpointing,
             max_seq_length=tokenizer.max_seq_length,
             dataset_text_field="text",
-            response_template=response_template,
             report_to=report_to,
             run_name=run_name,
             save_only_model=True,
@@ -89,11 +84,20 @@ class SFTTrainingRunner:
 
         args = self.build_sft_config()
 
+        # response_template: 이 토큰 이후부터가 completion(정답)
+        # DataCollatorForCompletionOnlyLM이 이 토큰 이전의 labels를 -100으로 마스킹
+        response_template = "<start_of_turn>model\n"
+        data_collator = DataCollatorForCompletionOnlyLM(
+            response_template=response_template,
+            tokenizer=self.tokenizer,
+        )
+
         self._trainer = SFTTrainer(
             model=self.model,
             train_dataset=self.train_dataset,
             eval_dataset=self.eval_dataset,
             processing_class=self.tokenizer,
+            data_collator=data_collator,
             compute_metrics=(self.metrics.compute_metrics if self.metrics else None),
             preprocess_logits_for_metrics=(
                 self.metrics.preprocess_logits_for_metrics if self.metrics else None
