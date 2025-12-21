@@ -30,7 +30,7 @@ train:
   gradient_checkpointing: false
   seed: 42
   weight_decay: 0.01
-  report_to: "none"  # none | wandb | tensorboard
+  report_to: "wandb"  # none | wandb | tensorboard
 
 infer:
   test_path: "/data/ephemeral/home/data/test.csv"
@@ -41,6 +41,6 @@ infer:
   adapter_path: null
 
 wandb:
-  project: "koreasat"
+  project: "koreasat_woohyun"
   entity: "hakiful-ai"
-  name: "beomi/gemma-ko-2b"
+  name: "beomi/gemma-ko-2b-joonbaseline"

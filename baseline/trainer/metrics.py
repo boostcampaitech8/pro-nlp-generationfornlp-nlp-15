@@ -18,16 +18,32 @@ class CustomMetrics:
     def preprocess_logits_for_metrics(self, logits, labels):
         """
         모델의 Logits 중 정답 토큰(1~5)에 해당하는 부분만 추출합니다.
-        (User provided logic: logits[:, -2, logit_idx])
+
+        동적 인덱스 탐색:
+        - labels에서 첫 번째 valid 토큰(-100이 아닌) 위치를 찾음
+        - 그 직전 위치의 logits가 정답을 예측하는 logits임
+        - 이 방식은 토크나이저나 EOS 토큰 구조에 관계없이 안정적으로 동작
         """
         logits = logits if not isinstance(logits, tuple) else logits[0]
 
-        # [Batch, Seq, Vocab] -> [Batch, 5] (특정 위치, 특정 후보군만 추출)
-        # 주의: 이 로직은 입력 시퀀스의 끝이 [정답토큰, EOS] 형태라고 가정합니다.
-        # 학습 데이터가 이 형태를 따르지 않으면 인덱스 에러나 잘못된 평가가 될 수 있습니다.
-        logits = logits[:, -2, self.logit_idx]
+        batch_size = logits.size(0)
+        batch_logits = []
 
-        return logits
+        for i in range(batch_size):
+            # labels에서 첫 번째 valid 토큰 위치 찾기 (labels != -100)
+            valid_mask = labels[i] != -100
+            valid_indices = valid_mask.nonzero(as_tuple=True)[0]
+
+            if len(valid_indices) > 0:
+                # 첫 번째 valid label 위치의 직전 = 정답 예측 위치
+                first_valid_pos = valid_indices[0].item()
+                pred_pos = first_valid_pos - 1
+                batch_logits.append(logits[i, pred_pos, self.logit_idx])
+            else:
+                # fallback: valid label이 없는 경우 (예외 상황)
+                batch_logits.append(logits[i, -1, self.logit_idx])
+
+        return torch.stack(batch_logits)
 
     def compute_metrics(self, evaluation_result):
         """

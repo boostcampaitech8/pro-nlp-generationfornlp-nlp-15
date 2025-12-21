@@ -39,13 +39,21 @@ def _load_tokenizer(
     model_name_or_path: str,
     *,
     max_seq_length: int,
+    add_special_tokens: bool = True,
 ) -> PreTrainedTokenizerBase:
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+
+    # 특수 토큰 등록 (단일 토큰으로 처리되도록)
+    if add_special_tokens:
+        special_tokens = {
+            "additional_special_tokens": ["<start_of_turn>", "<end_of_turn>"]
+        }
+        tokenizer.add_special_tokens(special_tokens)
 
     tokenizer.chat_template = GEMMA_CHAT_TEMPLATE
     if not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.eos_token
-        
+
     tokenizer.padding_side = "right"
     tokenizer.model_max_length = max_seq_length
 
@@ -84,6 +92,9 @@ def load_for_train(
         torch_dtype=torch_dtype,
     )
 
+    # 특수 토큰 추가에 따른 임베딩 리사이즈
+    model.resize_token_embeddings(len(tokenizer))
+
     if config.train.gradient_checkpointing:
         model.gradient_checkpointing_enable()
         model.enable_input_require_grads()
@@ -93,7 +104,7 @@ def load_for_train(
         lora_alpha=config.train.lora_alpha,
         lora_dropout=config.train.lora_dropout,
         target_modules=config.train.lora_target_modules,
-        bias="none",    
+        bias="none",
         task_type="CAUSAL_LM",
     )
 
@@ -110,7 +121,7 @@ def load_for_infer(
     Load model + tokenizer for inference.
     """
     torch_dtype = _resolve_torch_dtype(config)
-    
+
     tokenizer = _load_tokenizer(
         config.model.name_or_path,
         max_seq_length=config.tokenizer.max_seq_length,
@@ -120,6 +131,9 @@ def load_for_infer(
         config.model.name_or_path,
         torch_dtype=torch_dtype,
     )
+
+    # 특수 토큰 추가에 따른 임베딩 리사이즈
+    model.resize_token_embeddings(len(tokenizer))
 
     if adapter_path is not None:
         model = PeftModel.from_pretrained(model, adapter_path)
