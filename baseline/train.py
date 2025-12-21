@@ -15,7 +15,7 @@ from common.data.load_dataset import load_tokenized_qa_dataset
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="configs/train_config.yaml")
+    parser.add_argument("--config", type=str, default="baseline/configs/config.yaml")
     return parser.parse_args()
 
 
