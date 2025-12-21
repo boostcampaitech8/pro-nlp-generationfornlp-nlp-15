@@ -15,10 +15,10 @@ def load_tokenized_qa_dataset(
     tokenizer: PreTrainedTokenizerBase,
     *,
     max_length: int = 1024,
-    filter_by_max_length: bool = False,
+    do_filter_by_max_length: bool = False,
     require_answer: bool = True,
 ) -> Dataset:
-    
+
     logger.info("[SFTDataLoader] Loading QA examples")
     examples = load_qa_examples_from_csv(file_path)
 
@@ -35,7 +35,7 @@ def load_tokenized_qa_dataset(
     logger.info("[SFTDataLoader] Tokenizing")
     tokenized = tokenize_chat_dataset(dataset, tokenizer)
 
-    if filter_by_max_length:
+    if do_filter_by_max_length:
         logger.info(f"[SFTDataLoader] Filtering samples > {max_length} tokens")
         tokenized = filter_by_max_length(tokenized, max_length)
 
