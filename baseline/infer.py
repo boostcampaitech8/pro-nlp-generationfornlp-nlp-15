@@ -32,19 +32,21 @@ def main() -> None:
     log = logging.getLogger(__name__)
     log.info("Loaded config: %s", args.config)
 
-    # 3) wandb env (optional)
-    if config.wandb is not None:
+    wandb_conf = config.wandb
+    if wandb_conf is not None:
         set_wandb_env(
-            project=config.wandb.project,
-            entity=config.wandb.entity,
-            name=config.wandb.name,
+            project=wandb_conf.project,
+            entity=wandb_conf.entity,
+            name=wandb_conf.name,
             override=False,
         )
 
     # 4) model + tokenizer (+ adapter)
     adapter_path = None
     if config.infer.use_adapter:
-        adapter_path = config.infer.adapter_path or (Path(config.train.output_dir) / "final_adapter")
+        adapter_path = config.infer.adapter_path or (
+            Path(config.train.output_dir) / "final_adapter"
+        )
 
     model, tokenizer = load_for_infer(config, adapter_path=adapter_path)
     model.eval()
@@ -65,8 +67,12 @@ def main() -> None:
 
     results: list[dict[str, str]] = []
     with torch.inference_mode():
-        for i, item in tqdm(enumerate(ds), total=len(ds), desc="Inference", mininterval=0.5):
-            input_ids = torch.tensor(item["input_ids"], dtype=torch.long, device=device).unsqueeze(0)
+        for i, item in tqdm(
+            enumerate(ds), total=len(ds), desc="Inference", mininterval=0.5
+        ):
+            input_ids = torch.tensor(
+                item["input_ids"], dtype=torch.long, device=device
+            ).unsqueeze(0)
 
             logits = model(input_ids=input_ids).logits[0, -1, :].float()
             target_logits = logits[choice_ids]

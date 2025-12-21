@@ -3,7 +3,6 @@ import logging
 from pathlib import Path
 
 
-
 from .configs.load import load_config
 from .models.loader import load_for_train
 from .trainer.metrics import CustomMetrics
@@ -12,6 +11,7 @@ from .trainer.sft_runner import SFTTrainingRunner
 from common.utils.logger import setup_logging
 from common.utils.wandb import set_wandb_env
 from common.data.load_dataset import load_tokenized_qa_dataset
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -32,12 +32,13 @@ def main() -> None:
 
     # 3) set wandb
     wandb_conf = config.wandb
-    set_wandb_env(
-        project=wandb_conf.project,
-        entity=wandb_conf.entity,
-        name=wandb_conf.name,
-        override=False,
-    )
+    if wandb_conf is not None:
+        set_wandb_env(
+            project=wandb_conf.project,
+            entity=wandb_conf.entity,
+            name=wandb_conf.name,
+            override=False,
+        )
 
     # 4) model + tokenizer (+ LoRA)
     log.info("Loading model/tokenizer...")
