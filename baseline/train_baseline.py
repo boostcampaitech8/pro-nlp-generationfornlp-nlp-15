@@ -427,6 +427,7 @@ def main():
         save_only_model=True,
         report_to=args.report_to,
         dataset_kwargs={"skip_prepare_dataset": True},
+        fp16=True,
     )
 
     trainer = SFTTrainer(
