@@ -17,10 +17,14 @@ def load_text_qa_dataset(
     require_answer: bool = True,
 ) -> Dataset:
     """
-    TRL의 response_template을 사용하기 위해 text 형식으로 데이터셋 반환.
+    TRL의 completion_only_loss를 사용하기 위해 prompt/completion 형식으로 데이터셋 반환.
+
+    TRL 0.26.1에서 completion_only_loss가 작동하려면:
+    - 'prompt' 컬럼: system + user 메시지 (학습에서 제외됨)
+    - 'completion' 컬럼: assistant 응답 (학습 대상)
 
     Returns:
-        Dataset with 'text' column containing chat-formatted strings.
+        Dataset with 'prompt' and 'completion' columns.
     """
     logger.info("[SFTDataLoader] Loading QA examples")
     examples = load_qa_examples_from_csv(file_path)
@@ -28,20 +32,33 @@ def load_text_qa_dataset(
     if require_answer:
         examples = [ex for ex in examples if ex.answer is not None]
 
-    logger.info("[SFTDataLoader] Building chat messages and applying template")
-    texts: list[dict[str, str]] = []
+    logger.info("[SFTDataLoader] Building prompt/completion pairs")
+    data: list[dict[str, str]] = []
     for example in examples:
         messages_dict = build_chat_messages(example)
-        # chat template 적용하여 text로 변환
-        text = tokenizer.apply_chat_template(
-            messages_dict["messages"],
-            tokenize=False,
-            add_generation_prompt=False,
-        )
-        texts.append({"text": text})
+        messages = messages_dict["messages"]
 
-    dataset = Dataset.from_list(texts)
-    logger.info(f"[SFTDataLoader] Loaded {len(dataset)} samples with text format")
+        # prompt: system + user 메시지 (assistant 제외)
+        # add_generation_prompt=True로 <start_of_turn>model\n 까지 포함
+        prompt_messages = [m for m in messages if m["role"] != "assistant"]
+        prompt = tokenizer.apply_chat_template(
+            prompt_messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+
+        # completion: assistant 응답 + <end_of_turn>\n
+        assistant_message = next(
+            (m["content"] for m in messages if m["role"] == "assistant"), ""
+        )
+        completion = assistant_message + "<end_of_turn>\n"
+
+        data.append({"prompt": prompt, "completion": completion})
+
+    dataset = Dataset.from_list(data)
+    logger.info(
+        f"[SFTDataLoader] Loaded {len(dataset)} samples with prompt/completion format"
+    )
 
     return dataset
 
