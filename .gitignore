@@ -96,7 +96,8 @@ htmlcov/
 venv/
 env/
 .uv/
-uv.lock  # (팀에서 lock 공유할 거면 이 줄 삭제)
+# (팀에서 lock 공유할 거면 이 줄 삭제)
+uv.lock
 
 # === Jupyter ===
 .ipynb_checkpoints/
