@@ -320,6 +320,7 @@ def main():
             "paragraph": element["paragraph"],
             "input_ids": outputs["input_ids"],
             "attention_mask": outputs["attention_mask"],
+            "label": element["label"],
         }
 
     tokenized_dataset = dataset.map(
