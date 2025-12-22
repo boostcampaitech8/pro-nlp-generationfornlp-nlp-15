@@ -4,11 +4,12 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from trl import SFTConfig, SFTTrainer, DataCollatorForCompletionOnlyLM
+from trl import SFTConfig, SFTTrainer
 from transformers import PreTrainedTokenizerBase
 from transformers.modeling_utils import PreTrainedModel
 
 from ..configs.schema import Config
+from common.tokenization.chat_template import GEMMA_CHAT_TEMPLATE
 
 logger = logging.getLogger(__name__)
 
@@ -65,11 +66,15 @@ class SFTTrainingRunner:
             tf32=train.tf32,
             gradient_checkpointing=train.gradient_checkpointing,
             max_seq_length=tokenizer.max_seq_length,
-            dataset_text_field="text",
+            # [변경 1] 데이터셋이 Chat 포맷(List[Dict])이라면 text 필드 지정 불필요 (자동 감지)
+            # 만약 데이터셋 컬럼명이 'messages'가 아니라면 dataset_text_field 또는 dataset_kwargs로 매핑 필요
+            # dataset_text_field="text",
             report_to=report_to,
             run_name=run_name,
             save_only_model=True,
             seed=train.seed,
+            # [변경 2] 이 옵션을 켜면 Chat Template을 분석해 Assistant 응답만 학습
+            completion_only_loss=True,
         )
 
     def build_trainer(self) -> SFTTrainer:
@@ -82,22 +87,19 @@ class SFTTrainingRunner:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
 
+        self.tokenizer.chat_template = GEMMA_CHAT_TEMPLATE
+
         args = self.build_sft_config()
 
-        # response_template: 이 토큰 이후부터가 completion(정답)
-        # DataCollatorForCompletionOnlyLM이 이 토큰 이전의 labels를 -100으로 마스킹
-        response_template = "<start_of_turn>model\n"
-        data_collator = DataCollatorForCompletionOnlyLM(
-            response_template=response_template,
-            tokenizer=self.tokenizer,
-        )
+        # [변경 3] DataCollatorForCompletionOnlyLM 및 response_template 수동 지정 삭제
+        # SFTTrainer가 tokenizer.chat_template과 completion_only_loss=True 설정을 보고
+        # 자동으로 user 부분은 마스킹(-100), model 부분은 학습하도록 처리
 
         self._trainer = SFTTrainer(
             model=self.model,
             train_dataset=self.train_dataset,
             eval_dataset=self.eval_dataset,
             processing_class=self.tokenizer,
-            data_collator=data_collator,
             compute_metrics=(self.metrics.compute_metrics if self.metrics else None),
             preprocess_logits_for_metrics=(
                 self.metrics.preprocess_logits_for_metrics if self.metrics else None
