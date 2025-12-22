@@ -65,7 +65,7 @@ class SFTTrainingRunner:
             bf16=train.bf16,
             tf32=train.tf32,
             gradient_checkpointing=train.gradient_checkpointing,
-            max_seq_length=tokenizer.max_seq_length,
+            max_length=tokenizer.max_seq_length,
             # [변경 1] 데이터셋이 Chat 포맷(List[Dict])이라면 text 필드 지정 불필요 (자동 감지)
             # 만약 데이터셋 컬럼명이 'messages'가 아니라면 dataset_text_field 또는 dataset_kwargs로 매핑 필요
             # dataset_text_field="text",
