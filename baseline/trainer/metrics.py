@@ -21,6 +21,8 @@ class CustomMetrics:
             response_template, add_special_tokens=False
         )
 
+        self._debug_printed = False  # 디버깅 로그 1회만 출력
+
     def _find_response_start(self, input_ids) -> int:
         """
         input_ids(또는 labels)에서 정답 시작 위치를 찾습니다.
@@ -86,6 +88,31 @@ class CustomMetrics:
         """
         logits, labels = evaluation_result
 
+        # 디버깅: 첫 번째 샘플의 labels 정보 출력 (1회만)
+        if not self._debug_printed and len(labels) > 0:
+            self._debug_printed = True
+            first_label = (
+                labels[0].tolist() if hasattr(labels[0], "tolist") else list(labels[0])
+            )
+            print(
+                f"\n[DEBUG] labels type: {type(labels)}, shape: {labels.shape if hasattr(labels, 'shape') else len(labels)}"
+            )
+            print(f"[DEBUG] First label length: {len(first_label)}")
+            print(f"[DEBUG] First label (first 10): {first_label[:10]}")
+            print(f"[DEBUG] First label (last 10): {first_label[-10:]}")
+            # -100이 아닌 첫 번째 위치 찾기
+            non_masked_idx = -1
+            for i, v in enumerate(first_label):
+                if v != -100:
+                    non_masked_idx = i
+                    break
+            print(f"[DEBUG] First non-masked index: {non_masked_idx}")
+            if non_masked_idx >= 0 and non_masked_idx < len(first_label):
+                token_id = first_label[non_masked_idx]
+                print(f"[DEBUG] Token ID at that index: {token_id}")
+                if token_id != -100:
+                    print(f"[DEBUG] Decoded: {repr(self.tokenizer.decode([token_id]))}")
+
         # 1. 라벨에서 정답 추출 (-100이 아닌 첫 번째 토큰)
         parsed_labels = []
         valid_indices = []
@@ -93,7 +120,12 @@ class CustomMetrics:
         for idx, label_seq in enumerate(labels):
             response_start = self._find_response_start(label_seq)
             if response_start >= 0 and response_start < len(label_seq):
-                answer_token_id = label_seq[response_start]
+                label_list = (
+                    label_seq.tolist()
+                    if hasattr(label_seq, "tolist")
+                    else list(label_seq)
+                )
+                answer_token_id = label_list[response_start]
                 # -100이면 스킵 (패딩)
                 if answer_token_id == -100:
                     continue
@@ -105,6 +137,11 @@ class CustomMetrics:
                     # 1~5가 아닌 경우 (이상한 토큰)
                     parsed_labels.append(-1)
                     valid_indices.append(idx)
+
+        # 디버깅: 결과 출력
+        print(
+            f"[DEBUG] valid_indices count: {len(valid_indices)}, parsed_labels sample: {parsed_labels[:5] if parsed_labels else 'empty'}"
+        )
 
         if not valid_indices:
             return {
