@@ -29,6 +29,24 @@ class CustomMetrics:
         batch_size = logits.size(0)
         batch_logits = []
 
+        # 디버그: 첫 번째 배치의 labels 구조 출력 (1회만)
+        if not hasattr(self, "_debug_logged"):
+            self._debug_logged = True
+            print(f"\n[DEBUG] labels shape: {labels.shape}")
+            print(f"[DEBUG] labels[0] (last 20): {labels[0][-20:].tolist()}")
+            valid_count = (labels[0] != -100).sum().item()
+            print(f"[DEBUG] valid labels count in first sample: {valid_count}")
+            if valid_count > 0:
+                valid_mask = labels[0] != -100
+                valid_indices = valid_mask.nonzero(as_tuple=True)[0]
+                print(
+                    f"[DEBUG] first valid pos: {valid_indices[0].item()}, last valid pos: {valid_indices[-1].item()}"
+                )
+                valid_labels = labels[0][valid_mask].tolist()
+                print(
+                    f"[DEBUG] valid labels decoded: {self.tokenizer.decode(valid_labels)}"
+                )
+
         for i in range(batch_size):
             # labels에서 첫 번째 valid 토큰 위치 찾기 (labels != -100)
             valid_mask = labels[i] != -100
@@ -41,6 +59,7 @@ class CustomMetrics:
                 batch_logits.append(logits[i, pred_pos, self.logit_idx])
             else:
                 # fallback: valid label이 없는 경우 (예외 상황)
+                print(f"[DEBUG] WARNING: No valid labels in sample {i}")
                 batch_logits.append(logits[i, -1, self.logit_idx])
 
         return torch.stack(batch_logits)
