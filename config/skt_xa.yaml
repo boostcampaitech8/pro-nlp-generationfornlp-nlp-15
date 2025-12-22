@@ -10,7 +10,7 @@ tokenizer:
   padding_side: "left"
 
 train:
-  train_path: "/data/ephemeral/home/data/train.csv"
+  train_path: "/data/ephemeral/home/data/balanced.csv"
   output_dir: "./outputs"
 
   # LoRA (train only)

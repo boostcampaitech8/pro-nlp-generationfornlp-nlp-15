@@ -26,7 +26,7 @@ def load_qa_examples_from_csv(file_path: str) -> list[QAExample]:
             answer = str(answer).strip()
 
         # question_plus도 NaN이면 None 처리(옵션이지만 안전)
-        question_plus = problem.get("question_plus")
+        question_plus = row.get("question_plus")
         if pd.isna(question_plus):
             question_plus = None
         else:
@@ -34,6 +34,7 @@ def load_qa_examples_from_csv(file_path: str) -> list[QAExample]:
 
         examples.append(
             QAExample(
+                id=str(row["id"]),
                 paragraph=str(row["paragraph"]),
                 question=str(problem["question"]),
                 choices=[str(c) for c in problem["choices"]],
@@ -43,3 +44,33 @@ def load_qa_examples_from_csv(file_path: str) -> list[QAExample]:
         )
 
     return examples
+
+
+def save_qa_examples_to_csv(
+    examples: list[QAExample],
+    file_path: str,
+) -> None:
+    rows: list[dict[str, object]] = []
+
+    for ex in examples:
+        rows.append(
+            {
+                "id": ex.id,
+                "paragraph": ex.paragraph,
+                "problems": {
+                    "question": ex.question,
+                    "choices": ex.choices,
+                    "answer": ex.answer,
+                },
+                "question_plus": ex.question_plus,
+            }
+        )
+
+    df = pd.DataFrame(
+        rows,
+        columns=["id", "paragraph", "problems", "question_plus"],
+    )
+
+    # problems(dict) → 문자열로 저장
+    # load 시 literal_eval로 정확히 복원됨
+    df.to_csv(file_path, index=False)
