@@ -190,8 +190,11 @@ class DataCollatorForCompletionOnlyLM:
     def __call__(self, features: list[dict]) -> dict:
         # Extract input_ids, attention_mask, and labels
         batch_input_ids = [f["input_ids"] for f in features]
-        batch_attention_mask = [f["attention_mask"] for f in features]
-        batch_labels = [f.get("labels", f["input_ids"]) for f in features]
+        # Generate attention_mask if not present (all 1s for non-padded tokens)
+        batch_attention_mask = [
+            f.get("attention_mask", [1] * len(f["input_ids"])) for f in features
+        ]
+        batch_labels = [f.get("labels", f["input_ids"].copy()) for f in features]
 
         # Find max length for padding
         max_length = max(len(ids) for ids in batch_input_ids)
