@@ -409,7 +409,7 @@ def main():
         output_dir=args.output_dir,
         do_train=True,
         do_eval=True,
-        max_seq_length=CONFIG["max_seq_length"],
+        max_length=CONFIG["max_seq_length"],
         per_device_train_batch_size=CONFIG["per_device_train_batch_size"],
         per_device_eval_batch_size=CONFIG["per_device_eval_batch_size"],
         num_train_epochs=CONFIG["num_train_epochs"],
