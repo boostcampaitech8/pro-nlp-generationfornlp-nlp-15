@@ -13,7 +13,7 @@ from .models.loader import load_for_infer
 
 from common.utils.logger import setup_logging
 from common.utils.wandb import set_wandb_env
-from common.data.load_dataset import load_qa_dataset_prompt_answer
+from common.data.load_dataset import load_qa_dataset_tokenized
 from common.data.chat_tokenizer import tokenize_prompt_only
 
 
@@ -53,14 +53,11 @@ def main() -> None:
     device = next(model.parameters()).device
 
     # 5) tokenized dataset + ids
-    ds = load_qa_dataset_prompt_answer(
+    ds = load_qa_dataset_tokenized(
         file_path=str(config.infer.test_path),
         tokenizer=tokenizer,
-        require_answer=False,
-    )
-    ds = ds.map(
-        partial(tokenize_prompt_only, tokenizer=tokenizer, max_length=config.tokenizer.max_seq_length),
-        remove_columns=["prompt"],  # prompt는 토큰으로 대체
+        include_answer=False,
+        max_length=config.tokenizer.max_seq_length
     )
     test_df = pd.read_csv(config.infer.test_path)
     ids = test_df["id"].astype(str).tolist()

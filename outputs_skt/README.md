@@ -4,8 +4,8 @@ library_name: transformers
 model_name: outputs_skt
 tags:
 - generated_from_trainer
-- sft
 - trl
+- sft
 licence: license
 ---
 
@@ -27,7 +27,7 @@ print(output["generated_text"])
 
 ## Training procedure
 
-[<img src="https://raw.githubusercontent.com/wandb/assets/main/wandb-github-badge-28.svg" alt="Visualize in Weights & Biases" width="150" height="24"/>](https://wandb.ai/hakiful-ai/koreasat_yejoon/runs/13udisc3) 
+[<img src="https://raw.githubusercontent.com/wandb/assets/main/wandb-github-badge-28.svg" alt="Visualize in Weights & Biases" width="150" height="24"/>](https://wandb.ai/hakiful-ai/koreasat_yejoon/runs/jkcshn9d) 
 
 
 This model was trained with SFT.

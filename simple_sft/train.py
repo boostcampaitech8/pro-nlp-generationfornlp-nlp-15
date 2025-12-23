@@ -12,7 +12,7 @@ from .trainer.data_collator import DataCollatorForMCQ
 
 from common.utils.logger import setup_logging
 from common.utils.wandb import set_wandb_env
-from common.data.load_dataset import load_qa_dataset_prompt_answer
+from common.data.load_dataset import load_qa_dataset_tokenized
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -46,15 +46,17 @@ def main() -> None:
 
     # 5) dataset (single CSV -> train/val split)
     log.info("Building datasets...")
-    train_ds = load_qa_dataset_prompt_answer(
+    train_ds = load_qa_dataset_tokenized(
         file_path=str(config.train.train_path),
         tokenizer=tokenizer,
-        require_answer=True,
+        include_answer=True,
+        max_length=config.tokenizer.max_seq_length
     )
-    val_ds = load_qa_dataset_prompt_answer(
+    val_ds = load_qa_dataset_tokenized(
         file_path=str(config.train.valid_path),
         tokenizer=tokenizer,
-        require_answer=False,
+        include_answer=True,
+        max_length=config.tokenizer.max_seq_length
     )
     log.info("Dataset sizes: train=%d val=%d", len(train_ds), len(val_ds))
 

@@ -6,7 +6,7 @@ model:
   name_or_path: "skt/A.X-4.0-Light"
 
 tokenizer:
-  max_seq_length: 4096
+  max_seq_length: 10000
   padding_side: "right"
 
 train:
@@ -45,4 +45,4 @@ infer:
 wandb:
   project: "koreasat_yejoon"
   entity: "hakiful-ai"
-  name: "skt/A.X-4.0-Light_v2"
+  name: "skt/A.X-4.0-Light_v3"

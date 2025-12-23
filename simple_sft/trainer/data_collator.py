@@ -11,46 +11,31 @@ class DataCollatorForMCQ:
     tokenizer: PreTrainedTokenizerBase
     max_length: int | None = None
 
-    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
-        prompts = [f["prompt"] for f in features]
+    def __call__(self, features):
+        if any("answer" not in f or f["answer"] is None for f in features):
+            raise ValueError("DataCollatorForMCQ requires `answer` in all samples")
+        
+        input_ids = [f["input_ids"] for f in features]
+        attention_mask = [f["attention_mask"] for f in features]
         answers = [f["answer"] for f in features]
 
-        # 1) prompt tokenization
-        enc = self.tokenizer(
-            prompts,
-            padding=True,
-            truncation=True,
-            max_length=self.max_length,
+        # padding만 수행
+        batch = self.tokenizer.pad(
+            {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+            },
             return_tensors="pt",
         )
 
-        input_ids = enc["input_ids"]
-        attention_mask = enc["attention_mask"]
+        labels = torch.full_like(batch["input_ids"], -100)
 
-        # 2) labels 초기화
-        labels = torch.full_like(input_ids, fill_value=-100)
+        for i, a in enumerate(answers):
+            token_ids = self.tokenizer.encode(a, add_special_tokens=False)
+            assert len(token_ids) == 1
 
-        # 3) answer token id (single-token 강제)
-        answer_token_ids = [
-            self.tokenizer.encode(a, add_special_tokens=False)
-            for a in answers
-        ]
+            pos = batch["attention_mask"][i].sum().item() - 1
+            labels[i, pos] = token_ids[0]
 
-        for i, token_ids in enumerate(answer_token_ids):
-            if len(token_ids) != 1:
-                raise ValueError(
-                    f"Answer must be single token, got {token_ids}"
-                )
-
-            answer_token_id = token_ids[0]
-            prompt_len = attention_mask[i].sum().item()
-
-            pos = prompt_len - 1
-            input_ids[i, pos] = answer_token_id
-            labels[i, pos] = answer_token_id
-
-        return {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "labels": labels,
-        }
+        batch["labels"] = labels
+        return batch
