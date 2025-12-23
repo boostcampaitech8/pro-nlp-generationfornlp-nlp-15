@@ -304,8 +304,10 @@ async def run_api_inference_async(config_path: str, mode: str | None = None) -> 
             
             logger.info("Metrics logged to WandB")
     
-    # 결과 저장 (output.csv + output_raw.csv)
-    output_path, raw_output_path = save_results_with_raw(results, config['data']['output_dir'])
+    # 결과 저장 (output.csv + output_raw.csv + output_type.csv)
+    output_path, raw_output_path = save_results_with_raw(
+        results, config['data']['output_dir'], type_stats
+    )
     logger.info(f"Results saved to: {output_path}")
     logger.info(f"Raw responses saved to: {raw_output_path}")
     print(f"  - Results saved to: {output_path}")

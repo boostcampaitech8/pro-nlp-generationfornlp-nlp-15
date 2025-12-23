@@ -19,8 +19,9 @@ data:
   output_dir: "data"                     # 출력 디렉토리
 
 inference:
-  temperature: 0                         # 생성 온도 (0.0 = deterministic)
+  temperature: 0.0                         # 생성 온도 (0.0 = deterministic)
   max_tokens: 1024                       # 최대 생성 토큰 수
+  seed: 42                               # 랜덤 시드 (재현성 보장, null이면 미사용)
   system_prompt: "지문을 읽고 내용을 정리하시오. 각 선지별로 정답을 선택하기 위한 근거를 서술한 후 최종적으로 답변을 제시하시오, 정답을 제출할때는 정답: 숫자 형식으로 답변하시오"  # 시스템 프롬프트
   max_concurrent: 40                     # 동시 요청 수 (병렬 처리)
   tool_choice: "auto"                    # Function call 선택 방식 (vLLM Hermes: "auto" 권장)

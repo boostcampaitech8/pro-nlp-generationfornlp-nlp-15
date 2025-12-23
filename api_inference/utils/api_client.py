@@ -30,7 +30,8 @@ class APIClient:
         self,
         messages: List[Dict[str, str]],
         temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None
+        max_tokens: Optional[int] = None,
+        seed: Optional[int] = None
     ) -> str:
         """
         일반 채팅 완성 요청
@@ -39,15 +40,20 @@ class APIClient:
             messages: 채팅 메시지 리스트
             temperature: 생성 온도 (None이면 config 값 사용)
             max_tokens: 최대 토큰 수 (None이면 config 값 사용)
+            seed: 랜덤 시드 (None이면 config 값 사용, 재현성 보장)
         
         Returns:
             LLM 응답 텍스트
         """
+        # seed 결정: 함수 인자 > config > None
+        seed_value = seed if seed is not None else self.inference_config.get('seed')
+        
         response = self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
             temperature=temperature or self.inference_config.get('temperature', 0.0),
-            max_tokens=max_tokens or self.inference_config.get('max_tokens', 32)
+            max_tokens=max_tokens or self.inference_config.get('max_tokens', 32),
+            seed=seed_value
         )
         return response.choices[0].message.content
     
@@ -107,7 +113,8 @@ class AsyncAPIClient:
         self,
         messages: List[Dict[str, str]],
         temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None
+        max_tokens: Optional[int] = None,
+        seed: Optional[int] = None
     ) -> str:
         """
         비동기 채팅 완성 요청
@@ -116,15 +123,20 @@ class AsyncAPIClient:
             messages: 채팅 메시지 리스트
             temperature: 생성 온도 (None이면 config 값 사용)
             max_tokens: 최대 토큰 수 (None이면 config 값 사용)
+            seed: 랜덤 시드 (None이면 config 값 사용, 재현성 보장)
         
         Returns:
             LLM 응답 텍스트
         """
+        # seed 결정: 함수 인자 > config > None
+        seed_value = seed if seed is not None else self.inference_config.get('seed')
+        
         response = await self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
             temperature=temperature or self.inference_config.get('temperature', 0.0),
-            max_tokens=max_tokens or self.inference_config.get('max_tokens', 32)
+            max_tokens=max_tokens or self.inference_config.get('max_tokens', 32),
+            seed=seed_value
         )
         return response.choices[0].message.content
     

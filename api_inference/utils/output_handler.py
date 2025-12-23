@@ -61,21 +61,24 @@ def save_results(
 
 def save_results_with_raw(
     results: List[Dict[str, str]],
-    output_dir: str
+    output_dir: str,
+    type_stats: Dict[str, int] = None
 ) -> Tuple[str, str]:
     """
     추론 결과를 두 개의 CSV 파일로 저장
     - output_시간.csv: id, answer만 포함
     - output_raw_시간.csv: id, answer, question_type, raw_response 포함
+    - output_type_시간.csv: 문제 유형별 통계 (type_stats가 제공된 경우)
     
     Args:
         results: 결과 리스트 [{'id': ..., 'answer': ..., 'raw_response': ..., 'question_type': ...}, ...]
         output_dir: 출력 디렉토리
+        type_stats: 문제 유형별 통계 딕셔너리 (optional)
     
     Returns:
         (output 파일 경로, raw output 파일 경로) 튜플
     """
-    # 시간 suffix 생성 (두 파일에 동일하게 적용)
+    # 시간 suffix 생성 (모든 파일에 동일하게 적용)
     time_suffix = int(time.time()) % (10 ** 7)
     
     output_path = os.path.join(output_dir, f"output_{time_suffix}.csv")
@@ -96,6 +99,15 @@ def save_results_with_raw(
     df_raw = df_raw[[col for col in available_columns if col in df_raw.columns]]
     
     df_raw.to_csv(raw_output_path, index=False, encoding='utf-8-sig')
+    
+    # output_type.csv 저장 (문제 유형별 통계)
+    if type_stats is not None:
+        type_output_path = os.path.join(output_dir, f"output_type_{time_suffix}.csv")
+        df_type = pd.DataFrame([
+            {'question_type': qtype, 'count': count}
+            for qtype, count in type_stats.items()
+        ])
+        df_type.to_csv(type_output_path, index=False, encoding='utf-8-sig')
     
     return output_path, raw_output_path
 
