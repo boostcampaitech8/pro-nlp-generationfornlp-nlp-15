@@ -2,13 +2,14 @@
 # OpenAPI 호환 서버용 추론 설정 파일
 
 api:
-  base_url: "http://10.28.228.126:30372/v1"  # OpenAPI 호환 서버 URL (수정 가능)
+  base_url: "http://10.28.228.125:30730/v1"  # OpenAPI 호환 서버 URL (수정 가능)
   api_key: "EMPTY"                       # API 키 (로컬 서버의 경우 EMPTY)
   model_name: "local_model"              # 모델 이름
   timeout: 120                           # 요청 타임아웃 (초)
   max_retries: 3                         # 최대 재시도 횟수
 
 data:
+  train_path: "data/train.csv"           # 학습 데이터 경로
   test_path: "data/test.csv"             # 테스트 데이터 경로
   output_dir: "data"                     # 출력 디렉토리
 
