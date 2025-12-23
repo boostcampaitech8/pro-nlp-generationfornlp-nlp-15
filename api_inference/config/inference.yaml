@@ -1,8 +1,13 @@
 # API Inference Configuration
 # OpenAPI 호환 서버용 추론 설정 파일
 
+# 실행 모드 ("train" 또는 "test")
+# - train: train.csv 사용, F1 Score 계산, wandb 기록
+# - test: test.csv 사용, 결과만 저장
+mode: "train"
+
 api:
-  base_url: "http://10.28.228.125:30730/v1"  # OpenAPI 호환 서버 URL (수정 가능)
+  base_url: "http://10.28.228.126:30449/v1"  # OpenAPI 호환 서버 URL (수정 가능)
   api_key: "EMPTY"                       # API 키 (로컬 서버의 경우 EMPTY)
   model_name: "local_model"              # 모델 이름
   timeout: 120                           # 요청 타임아웃 (초)
@@ -21,3 +26,7 @@ inference:
   tool_choice: "auto"                    # Function call 선택 방식 (vLLM Hermes: "auto" 권장)
   use_type_specific_prompt: true         # 문제 유형별 프롬프트 사용 여부 (true: 유형별, false: 기본)
 
+wandb:
+  project: "koreasat_jisoo"
+  entity: "hakiful-ai"
+  name: "exaone-32b/problem-classification"

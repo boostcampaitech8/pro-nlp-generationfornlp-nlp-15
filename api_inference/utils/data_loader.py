@@ -2,17 +2,33 @@
 데이터 로딩 및 프롬프트 생성 모듈
 - test.csv 로딩 및 problems 파싱
 - 문제 유형 분류 및 유형별 프롬프트 생성
-- 기존 baseline/model_utils.py의 프롬프트 형식 재사용
+- common 모듈의 기본 요소를 import하여 확장
+
+common 모듈에서 가져오는 것:
+- BASE_PROMPT_FORMAT: 기본 프롬프트 템플릿
+- SYSTEM_PROMPT: 기본 시스템 프롬프트  
+- format_question_message: 기본 메시지 포맷터 (common_format_question_message로 alias)
+- load_qa_examples_from_csv: CSV 로더 (QAExample 반환)
+- QAExample: 데이터 클래스
+
+api_inference에서 확장하는 것:
+- QuestionType: 문제 유형 열거형
+- 유형별 프롬프트 템플릿 (MULTI_LABEL, SINGLE_CORRECT, SEQUENCE, FILL_BLANK)
+- classify_question_type: 규칙 기반 문제 유형 분류
 """
 import re
-import pandas as pd
-from ast import literal_eval
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Any
 from enum import Enum
+
+# ===== common 모듈에서 기본 요소 import =====
+from common.prompts.templates import BASE_PROMPT_FORMAT as COMMON_BASE_PROMPT_FORMAT
+from common.prompts.system import SYSTEM_PROMPT as COMMON_SYSTEM_PROMPT
+from common.prompts.formatter import format_question_message as common_format_question_message
+from common.data.read_csv import load_qa_examples_from_csv
 
 
 class QuestionType(Enum):
-    """문제 유형 열거형"""
+    """문제 유형 열거형 (api_inference 전용 확장)"""
     MULTI_LABEL = "multi_label"           # 옳은 것 모두 고르기 (ㄱ, ㄴ, ㄷ 형)
     SINGLE_CORRECT = "single_correct"     # 옳은 것/옳지 않은 것 단일 선택
     SEQUENCE = "sequence"                  # 시간 순서대로 나열하기
@@ -20,9 +36,9 @@ class QuestionType(Enum):
     DEFAULT = "default"                    # 기본 유형
 
 
-# ===== 유형별 프롬프트 템플릿 =====
+# ===== 유형별 프롬프트 템플릿 (api_inference 전용 확장) =====
 
-# 기본 프롬프트 (baseline/model_utils.py와 동일)
+# 기본 프롬프트 - common 기반으로 api_inference용 꼬리 문구 추가
 BASE_PROMPT_FORMAT = """지문:
 {paragraph}
 
@@ -102,13 +118,13 @@ PROMPT_TEMPLATES = {
     QuestionType.DEFAULT: BASE_PROMPT_FORMAT,
 }
 
-# 유형별 시스템 프롬프트
+# 유형별 시스템 프롬프트 (common의 SYSTEM_PROMPT 확장)
 SYSTEM_PROMPTS = {
     QuestionType.MULTI_LABEL: "지문을 읽고 각 보기의 옳고 그름을 판단하여 질문에 답하세요.",
     QuestionType.SINGLE_CORRECT: "지문을 읽고 옳은 것 또는 옳지 않은 것을 정확히 고르세요.",
     QuestionType.SEQUENCE: "지문을 읽고 시간 순서를 정확히 파악하여 답하세요.",
     QuestionType.FILL_BLANK: "지문을 읽고 빈칸에 들어갈 알맞은 내용을 고르세요.",
-    QuestionType.DEFAULT: "지문을 읽고 질문의 답을 구하세요.",
+    QuestionType.DEFAULT: COMMON_SYSTEM_PROMPT,  # common의 기본 시스템 프롬프트 사용
 }
 
 
@@ -252,6 +268,7 @@ def format_question_message(
 def load_test_data(test_path: str) -> List[Dict[str, Any]]:
     """
     테스트 데이터 로드 및 파싱 (문제 유형 분류 포함)
+    common/data/read_csv.py의 load_qa_examples_from_csv를 활용합니다.
     
     Args:
         test_path: test.csv 파일 경로
@@ -265,37 +282,29 @@ def load_test_data(test_path: str) -> List[Dict[str, Any]]:
             'question_plus': <보기> (있는 경우),
             'choices': 선택지 리스트,
             'num_choices': 선택지 개수 (4 또는 5),
-            'question_type': 문제 유형 (QuestionType)
+            'question_type': 문제 유형 (QuestionType),
+            'answer': 정답 (있는 경우)
         }
     """
-    df = pd.read_csv(test_path)
+    qa_examples = load_qa_examples_from_csv(test_path)
     
     test_data = []
-    for _, row in df.iterrows():
-        problems = literal_eval(row['problems'])
-        
-        # question_plus 처리 (컬럼에 있거나 problems dict에 있을 수 있음)
-        question_plus = None
-        if 'question_plus' in row and pd.notna(row['question_plus']):
-            question_plus = row['question_plus']
-        elif 'question_plus' in problems and problems['question_plus']:
-            question_plus = problems['question_plus']
-        
-        # 문제 유형 분류
+    for idx, example in enumerate(qa_examples):
         question_type = classify_question_type(
-            question=problems['question'],
-            question_plus=question_plus,
-            choices=problems['choices']
+            question=example.question,
+            question_plus=example.question_plus,
+            choices=example.choices
         )
         
         test_data.append({
-            'id': row['id'],
-            'paragraph': row['paragraph'],
-            'question': problems['question'],
-            'question_plus': question_plus,
-            'choices': problems['choices'],
-            'num_choices': len(problems['choices']),
-            'question_type': question_type
+            'id': idx,
+            'paragraph': example.paragraph,
+            'question': example.question,
+            'question_plus': example.question_plus,
+            'choices': example.choices,
+            'num_choices': len(example.choices),
+            'question_type': question_type,
+            'answer': example.answer
         })
     
     return test_data
@@ -303,7 +312,7 @@ def load_test_data(test_path: str) -> List[Dict[str, Any]]:
 
 def create_messages(
     user_message: str,
-    system_prompt: str = "지문을 읽고 질문의 답을 구하세요.",
+    system_prompt: str = None,
     question_type: QuestionType = None
 ) -> List[Dict[str, str]]:
     """
@@ -317,8 +326,15 @@ def create_messages(
     Returns:
         OpenAI API 형식의 메시지 리스트
     """
-    # 문제 유형이 지정되었고 시스템 프롬프트가 기본값이면 유형별 프롬프트 사용
-    if question_type is not None and system_prompt == "지문을 읽고 질문의 답을 구하세요.":
+    # 시스템 프롬프트 결정 로직
+    if system_prompt is None:
+        # 문제 유형이 지정되면 유형별 프롬프트, 아니면 common의 기본 프롬프트
+        if question_type is not None:
+            system_prompt = SYSTEM_PROMPTS.get(question_type, COMMON_SYSTEM_PROMPT)
+        else:
+            system_prompt = COMMON_SYSTEM_PROMPT
+    elif system_prompt == COMMON_SYSTEM_PROMPT and question_type is not None:
+        # 기본 프롬프트가 전달되었지만 유형이 지정된 경우 유형별 프롬프트 사용
         system_prompt = SYSTEM_PROMPTS.get(question_type, system_prompt)
     
     return [
@@ -342,4 +358,187 @@ def get_question_type_stats(test_data: List[Dict[str, Any]]) -> Dict[str, int]:
         question_type = item.get('question_type', QuestionType.DEFAULT)
         stats[question_type.value] += 1
     return stats
+
+
+def compute_f1_score(predictions: List[str], labels: List[str]) -> Dict[str, float]:
+    """
+    예측값과 정답 레이블로 Macro F1 Score 및 Accuracy를 계산합니다.
+    
+    Args:
+        predictions: 예측 답변 리스트 ("1", "2", "3", "4", "5")
+        labels: 정답 레이블 리스트 ("1", "2", "3", "4", "5")
+    
+    Returns:
+        {
+            'accuracy': 정확도,
+            'f1_macro': Macro F1 Score,
+            'f1_weighted': Weighted F1 Score,
+            'correct': 맞은 개수,
+            'total': 전체 개수
+        }
+    """
+    from collections import Counter
+    
+    # 유효한 예측만 필터링 (answer가 "0"인 경우 파싱 실패)
+    valid_pairs = [
+        (pred, label) for pred, label in zip(predictions, labels)
+        if pred != "0" and label is not None
+    ]
+    
+    if not valid_pairs:
+        return {
+            'accuracy': 0.0,
+            'f1_macro': 0.0,
+            'f1_weighted': 0.0,
+            'correct': 0,
+            'total': 0
+        }
+    
+    valid_preds, valid_labels = zip(*valid_pairs)
+    
+    # Accuracy 계산
+    correct = sum(1 for p, l in zip(valid_preds, valid_labels) if p == l)
+    accuracy = correct / len(valid_pairs)
+    
+    # 모든 클래스 (1~5)
+    all_classes = set(valid_preds) | set(valid_labels)
+    
+    # 클래스별 F1 계산
+    f1_scores = []
+    weighted_f1_scores = []
+    label_counts = Counter(valid_labels)
+    total_samples = len(valid_labels)
+    
+    for cls in all_classes:
+        # True Positives, False Positives, False Negatives
+        tp = sum(1 for p, l in zip(valid_preds, valid_labels) if p == cls and l == cls)
+        fp = sum(1 for p, l in zip(valid_preds, valid_labels) if p == cls and l != cls)
+        fn = sum(1 for p, l in zip(valid_preds, valid_labels) if p != cls and l == cls)
+        
+        # Precision, Recall
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        
+        # F1
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+        f1_scores.append(f1)
+        
+        # Weighted F1
+        weight = label_counts[cls] / total_samples if cls in label_counts else 0
+        weighted_f1_scores.append(f1 * weight)
+    
+    f1_macro = sum(f1_scores) / len(f1_scores) if f1_scores else 0.0
+    f1_weighted = sum(weighted_f1_scores)
+    
+    return {
+        'accuracy': accuracy,
+        'f1_macro': f1_macro,
+        'f1_weighted': f1_weighted,
+        'correct': correct,
+        'total': len(valid_pairs)
+    }
+
+
+def compute_f1_by_question_type(
+    results: List[Dict[str, Any]],
+    test_data: List[Dict[str, Any]]
+) -> Dict[str, Dict[str, float]]:
+    """
+    문제 유형별 F1 Score를 계산합니다.
+    
+    Args:
+        results: API 추론 결과 리스트 [{'id': ..., 'answer': ..., 'question_type': ...}, ...]
+        test_data: 정답이 포함된 테스트 데이터 리스트
+    
+    Returns:
+        유형별 metrics 딕셔너리
+        {
+            'multi_label': {'accuracy': ..., 'f1_macro': ..., ...},
+            'single_correct': {...},
+            ...
+            'overall': {...}
+        }
+    """
+    # ID로 정답 매핑
+    id_to_answer = {item['id']: item.get('answer') for item in test_data}
+    id_to_type = {item['id']: item.get('question_type', QuestionType.DEFAULT) for item in test_data}
+    
+    # 유형별로 그룹화
+    type_predictions = {qt.value: [] for qt in QuestionType}
+    type_labels = {qt.value: [] for qt in QuestionType}
+    
+    all_predictions = []
+    all_labels = []
+    
+    for result in results:
+        item_id = result['id']
+        pred = result['answer']
+        label = id_to_answer.get(item_id)
+        q_type = id_to_type.get(item_id, QuestionType.DEFAULT)
+        
+        if isinstance(q_type, QuestionType):
+            q_type = q_type.value
+        
+        if label is not None:
+            type_predictions[q_type].append(pred)
+            type_labels[q_type].append(label)
+            all_predictions.append(pred)
+            all_labels.append(label)
+    
+    # 유형별 metrics 계산
+    metrics_by_type = {}
+    for q_type in QuestionType:
+        preds = type_predictions[q_type.value]
+        labels = type_labels[q_type.value]
+        if preds and labels:
+            metrics_by_type[q_type.value] = compute_f1_score(preds, labels)
+        else:
+            metrics_by_type[q_type.value] = {
+                'accuracy': 0.0,
+                'f1_macro': 0.0,
+                'f1_weighted': 0.0,
+                'correct': 0,
+                'total': 0
+            }
+    
+    # 전체 metrics
+    metrics_by_type['overall'] = compute_f1_score(all_predictions, all_labels)
+    
+    return metrics_by_type
+
+
+def print_evaluation_report(metrics_by_type: Dict[str, Dict[str, float]]) -> None:
+    """
+    평가 결과를 포맷팅하여 출력합니다.
+    
+    Args:
+        metrics_by_type: compute_f1_by_question_type의 반환값
+    """
+    print("\n" + "=" * 60)
+    print("                    평가 결과 (Evaluation Report)")
+    print("=" * 60)
+    
+    # 유형별 결과
+    print("\n[문제 유형별 성능]")
+    print("-" * 60)
+    print(f"{'유형':<20} {'정확도':>10} {'F1(Macro)':>12} {'정답':>10}")
+    print("-" * 60)
+    
+    for q_type in QuestionType:
+        metrics = metrics_by_type.get(q_type.value, {})
+        if metrics.get('total', 0) > 0:
+            print(f"{q_type.value:<20} {metrics['accuracy']*100:>9.2f}% {metrics['f1_macro']*100:>11.2f}% {metrics['correct']:>5}/{metrics['total']:<4}")
+    
+    print("-" * 60)
+    
+    # 전체 결과
+    overall = metrics_by_type.get('overall', {})
+    if overall.get('total', 0) > 0:
+        print(f"\n[전체 성능 (Overall)]")
+        print(f"  - Accuracy:     {overall['accuracy']*100:.2f}% ({overall['correct']}/{overall['total']})")
+        print(f"  - F1 (Macro):   {overall['f1_macro']*100:.2f}%")
+        print(f"  - F1 (Weighted): {overall['f1_weighted']*100:.2f}%")
+    
+    print("=" * 60 + "\n")
+
 

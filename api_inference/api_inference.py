@@ -11,15 +11,20 @@
 import re
 import asyncio
 import argparse
+import logging
+from pathlib import Path
 import yaml
 from tqdm.asyncio import tqdm_asyncio
 
 from .utils.api_client import AsyncAPIClient
 from .utils.data_loader import (
     load_test_data, format_question_message, create_messages,
-    QuestionType, SYSTEM_PROMPTS, get_question_type_stats
+    QuestionType, SYSTEM_PROMPTS, get_question_type_stats,
+    compute_f1_by_question_type, print_evaluation_report
 )
 from .utils.output_handler import save_results_with_raw
+from common.utils.wandb import set_wandb_env
+from common.utils.logger import setup_logging
 
 # 최대 재시도 횟수
 MAX_RETRY = 5
@@ -150,12 +155,15 @@ async def process_single_item(
         }
 
 
-async def run_api_inference_async(config_path: str) -> tuple:
+async def run_api_inference_async(config_path: str, mode: str | None = None) -> tuple:
     """
     일반 응답 파싱 방식으로 수능 문제 추론 실행 (비동기 병렬)
     
     Args:
         config_path: inference.yaml 설정 파일 경로
+        mode: "train" 또는 "test" (None이면 yaml에서 읽음)
+              - train: train.csv 사용, F1 Score 계산 및 wandb 기록
+              - test: test.csv 사용, 결과만 저장
     
     Returns:
         (output 파일 경로, raw output 파일 경로) 튜플
@@ -164,11 +172,56 @@ async def run_api_inference_async(config_path: str) -> tuple:
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
     
+    # Logger 초기화
+    output_dir = Path(config['data']['output_dir'])
+    setup_logging(output_dir)
+    logger = logging.getLogger(__name__)
+    
+    # httpx, openai 로거 레벨 조정 (불필요한 HTTP 로그 숨김)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("openai").setLevel(logging.WARNING)
+    
+    # mode 결정: CLI 인자 > yaml 설정 > 기본값 "test"
+    if mode is None:
+        mode = config.get('mode', 'test')
+    
+    is_train_mode = (mode == "train")
+    logger.info(f"Running in '{mode}' mode")
+    
+    # WandB 초기화 (train 모드일 때만)
+    wandb_run = None
+    if is_train_mode and 'wandb' in config:
+        import wandb
+        wandb_config = config['wandb']
+        set_wandb_env(
+            project=wandb_config.get('project'),
+            entity=wandb_config.get('entity'),
+            name=wandb_config.get('name'),
+        )
+        wandb_run = wandb.init(
+            project=wandb_config.get('project'),
+            entity=wandb_config.get('entity'),
+            name=wandb_config.get('name'),
+            config={
+                'api': config.get('api', {}),
+                'inference': config.get('inference', {}),
+                'data': config.get('data', {}),
+            }
+        )
+        logger.info(f"WandB initialized: {wandb_config.get('project')}/{wandb_config.get('name')}")
+    
     # 비동기 API 클라이언트 초기화
     client = AsyncAPIClient(config)
     
-    # 테스트 데이터 로드
-    test_data = load_test_data(config['data']['test_path'])
+    # 데이터 로드 (train 모드면 train_path, test 모드면 test_path)
+    if is_train_mode:
+        data_path = config['data'].get('train_path', 'data/train.csv')
+        print(f"[Train Mode] Loading data from: {data_path}")
+    else:
+        data_path = config['data']['test_path']
+        print(f"[Test Mode] Loading data from: {data_path}")
+    
+    test_data = load_test_data(data_path)
     
     # 문제 유형별 통계 출력
     type_stats = get_question_type_stats(test_data)
@@ -206,19 +259,69 @@ async def run_api_inference_async(config_path: str) -> tuple:
     
     # 파싱 실패 통계
     failed_count = sum(1 for r in results if r['answer'] == "0")
+    logger.info(f"Inference Complete! (Failed to parse: {failed_count}/{len(results)})")
     print(f"Inference Complete! (Failed to parse: {failed_count}/{len(results)})")
+    
+    # Train 모드일 경우 F1 Score 계산 및 출력
+    if is_train_mode:
+        metrics_by_type = compute_f1_by_question_type(results, test_data)
+        print_evaluation_report(metrics_by_type)
+        
+        # Logger에 기록
+        overall = metrics_by_type.get('overall', {})
+        logger.info(f"Evaluation Results - Accuracy: {overall.get('accuracy', 0)*100:.2f}%, F1 (Macro): {overall.get('f1_macro', 0)*100:.2f}%")
+        
+        # WandB에 기록
+        if wandb_run is not None:
+            import wandb
+            
+            # Overall metrics
+            wandb.log({
+                'eval/accuracy': overall.get('accuracy', 0),
+                'eval/f1_macro': overall.get('f1_macro', 0),
+                'eval/f1_weighted': overall.get('f1_weighted', 0),
+                'eval/correct': overall.get('correct', 0),
+                'eval/total': overall.get('total', 0),
+                'eval/failed_parse': failed_count,
+            })
+            
+            # 유형별 metrics
+            for q_type in QuestionType:
+                type_metrics = metrics_by_type.get(q_type.value, {})
+                if type_metrics.get('total', 0) > 0:
+                    wandb.log({
+                        f'eval/{q_type.value}/accuracy': type_metrics.get('accuracy', 0),
+                        f'eval/{q_type.value}/f1_macro': type_metrics.get('f1_macro', 0),
+                        f'eval/{q_type.value}/correct': type_metrics.get('correct', 0),
+                        f'eval/{q_type.value}/total': type_metrics.get('total', 0),
+                    })
+            
+            logger.info("Metrics logged to WandB")
     
     # 결과 저장 (output.csv + output_raw.csv)
     output_path, raw_output_path = save_results_with_raw(results, config['data']['output_dir'])
+    logger.info(f"Results saved to: {output_path}")
+    logger.info(f"Raw responses saved to: {raw_output_path}")
     print(f"  - Results saved to: {output_path}")
     print(f"  - Raw responses saved to: {raw_output_path}")
+    
+    # WandB 종료
+    if wandb_run is not None:
+        wandb_run.finish()
+        logger.info("WandB run finished")
     
     return output_path, raw_output_path
 
 
-def run_api_inference(config_path: str) -> tuple:
-    """동기 래퍼 함수"""
-    return asyncio.run(run_api_inference_async(config_path))
+def run_api_inference(config_path: str, mode: str | None = None) -> tuple:
+    """
+    동기 래퍼 함수
+    
+    Args:
+        config_path: 설정 파일 경로
+        mode: "train" 또는 "test" (None이면 yaml에서 읽음)
+    """
+    return asyncio.run(run_api_inference_async(config_path, mode))
 
 
 def main():
@@ -231,9 +334,30 @@ def main():
         required=True,
         help="inference.yaml 설정 파일 경로"
     )
+    
+    # --train / --test 선택적 (지정하면 yaml 설정 오버라이드)
+    mode_group = parser.add_mutually_exclusive_group(required=False)
+    mode_group.add_argument(
+        "--train",
+        action="store_true",
+        help="Train 모드: train.csv로 추론 후 F1 Score 계산 및 wandb 기록 (yaml 설정 오버라이드)"
+    )
+    mode_group.add_argument(
+        "--test",
+        action="store_true",
+        help="Test 모드: test.csv로 추론 후 결과만 저장 (yaml 설정 오버라이드)"
+    )
+    
     args = parser.parse_args()
     
-    run_api_inference(args.config)
+    # CLI에서 모드 지정했으면 사용, 아니면 None (yaml에서 읽음)
+    mode = None
+    if args.train:
+        mode = "train"
+    elif args.test:
+        mode = "test"
+    
+    run_api_inference(args.config, mode)
 
 
 if __name__ == "__main__":
