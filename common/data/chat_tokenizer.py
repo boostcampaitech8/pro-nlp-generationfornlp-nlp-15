@@ -2,6 +2,22 @@ from datasets import Dataset
 from transformers import PreTrainedTokenizerBase
 
 
+def tokenize_prompt_only(
+    example: dict,
+    tokenizer: PreTrainedTokenizerBase,
+    max_length: int | None = None,
+):
+    enc = tokenizer(
+        example["prompt"],
+        truncation=True,
+        max_length=max_length,
+    )
+
+    return {
+        "input_ids": enc["input_ids"],
+        "attention_mask": enc["attention_mask"],
+    }
+
 def tokenize_chat_dataset(
     dataset: Dataset,
     tokenizer: PreTrainedTokenizerBase,

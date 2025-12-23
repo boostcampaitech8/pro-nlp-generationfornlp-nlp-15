@@ -46,17 +46,16 @@ def main() -> None:
 
     # 5) dataset (single CSV -> train/val split)
     log.info("Building datasets...")
-    ds = load_qa_dataset_prompt_answer(
+    train_ds = load_qa_dataset_prompt_answer(
         file_path=str(config.train.train_path),
         tokenizer=tokenizer,
         require_answer=True,
     )
-    split = ds.train_test_split(
-        test_size=0.1,
-        seed=config.train.seed,
+    val_ds = load_qa_dataset_prompt_answer(
+        file_path=str(config.train.valid_path),
+        tokenizer=tokenizer,
+        require_answer=False,
     )
-    train_ds = split["train"]
-    val_ds = split["test"]
     log.info("Dataset sizes: train=%d val=%d", len(train_ds), len(val_ds))
 
     # 6) metrics, data collator

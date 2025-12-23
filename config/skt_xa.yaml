@@ -6,11 +6,12 @@ model:
   name_or_path: "skt/A.X-4.0-Light"
 
 tokenizer:
-  max_seq_length: 2048
+  max_seq_length: 4096
   padding_side: "right"
 
 train:
-  train_path: "/data/ephemeral/home/ksat_data/train_split.csv"
+  train_path: "/data/ephemeral/home/ksat_data/train.csv"
+  valid_path: "/data/ephemeral/home/ksat_data/valid.csv"
   output_dir: "./outputs_skt"
 
   # LoRA (train only)
@@ -34,7 +35,7 @@ train:
   report_to: "wandb"  # none | wandb | tensorboard
 
 infer:
-  test_path: "/data/ephemeral/home/ksat_data/valid_split.csv"
+  test_path: "/data/ephemeral/home/ksat_data/test.csv"
   output_path: "output.csv"
 
   # adapter_path가 null이면 {train.output_dir}/final_adapter 사용 (코드에서)
@@ -44,4 +45,4 @@ infer:
 wandb:
   project: "koreasat_yejoon"
   entity: "hakiful-ai"
-  name: "skt/A.X-4.0-Light_balanced_right_padded"
+  name: "skt/A.X-4.0-Light_v2"

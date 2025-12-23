@@ -6,13 +6,15 @@ import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
+from functools import partial
 
 from .configs.load import load_config
 from .models.loader import load_for_infer
 
 from common.utils.logger import setup_logging
 from common.utils.wandb import set_wandb_env
-from common.data.load_dataset import load_tokenized_qa_dataset
+from common.data.load_dataset import load_qa_dataset_prompt_answer
+from common.data.chat_tokenizer import tokenize_prompt_only
 
 
 def parse_args() -> argparse.Namespace:
@@ -51,11 +53,14 @@ def main() -> None:
     device = next(model.parameters()).device
 
     # 5) tokenized dataset + ids
-    ds = load_tokenized_qa_dataset(
+    ds = load_qa_dataset_prompt_answer(
         file_path=str(config.infer.test_path),
         tokenizer=tokenizer,
-        max_length=config.tokenizer.max_seq_length,
         require_answer=False,
+    )
+    ds = ds.map(
+        partial(tokenize_prompt_only, tokenizer=tokenizer, max_length=config.tokenizer.max_seq_length),
+        remove_columns=["prompt"],  # prompt는 토큰으로 대체
     )
     test_df = pd.read_csv(config.infer.test_path)
     ids = test_df["id"].astype(str).tolist()

@@ -45,7 +45,6 @@ class DataCollatorForMCQ:
             answer_token_id = token_ids[0]
             prompt_len = attention_mask[i].sum().item()
 
-            # prompt 마지막 위치에 answer를 둠
             pos = prompt_len - 1
             input_ids[i, pos] = answer_token_id
             labels[i, pos] = answer_token_id
