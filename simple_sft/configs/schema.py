@@ -29,6 +29,7 @@ class TrainConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     train_path: Path
+    valid_path: Path
     output_dir: Path
 
     # LoRA (train only) - 1-depth 유지: nested 없이 train 내부에 flat로 둠

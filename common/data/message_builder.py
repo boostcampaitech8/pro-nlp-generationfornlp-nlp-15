@@ -4,7 +4,7 @@ from ..prompts.system import SYSTEM_PROMPT
 from .schema import QAExample
 
 
-def build_chat_messages(example: QAExample) -> dict[str, list[dict[str, str]]]:
+def build_chat_messages(example: QAExample, include_answer: bool=False) -> dict[str, list[dict[str, str]]]:
     """
     Build chat-style messages from a QAExample.
     """
@@ -20,7 +20,7 @@ def build_chat_messages(example: QAExample) -> dict[str, list[dict[str, str]]]:
         {"role": "user", "content": user_message},
     ]
 
-    if example.answer is not None:
+    if include_answer and example.answer is not None:
         messages.append(
             {"role": "assistant", "content": example.answer}
         )

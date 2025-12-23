@@ -8,10 +8,11 @@ from .configs.load import load_config
 from .models.loader import load_for_train
 from .trainer.metrics import CustomMetrics
 from .trainer.sft_runner import SFTTrainingRunner
+from .trainer.data_collator import DataCollatorForMCQ
 
 from common.utils.logger import setup_logging
 from common.utils.wandb import set_wandb_env
-from common.data.load_dataset import load_tokenized_qa_dataset
+from common.data.load_dataset import load_qa_dataset_prompt_answer
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -45,10 +46,9 @@ def main() -> None:
 
     # 5) dataset (single CSV -> train/val split)
     log.info("Building datasets...")
-    ds = load_tokenized_qa_dataset(
+    ds = load_qa_dataset_prompt_answer(
         file_path=str(config.train.train_path),
         tokenizer=tokenizer,
-        max_length=config.tokenizer.max_seq_length,
         require_answer=True,
     )
     split = ds.train_test_split(
@@ -59,8 +59,12 @@ def main() -> None:
     val_ds = split["test"]
     log.info("Dataset sizes: train=%d val=%d", len(train_ds), len(val_ds))
 
-    # 6) metrics
+    # 6) metrics, data collator
     metrics = CustomMetrics(tokenizer)
+    data_collator = DataCollatorForMCQ(
+        tokenizer=tokenizer,
+        max_length=tokenizer.model_max_length,
+    )
 
     # 7) trainer runner
     runner = SFTTrainingRunner(
@@ -71,6 +75,7 @@ def main() -> None:
         eval_dataset=val_ds,
         peft_config=peft_config,
         metrics=metrics,
+        data_collator=data_collator,
     )
 
     runner.train()

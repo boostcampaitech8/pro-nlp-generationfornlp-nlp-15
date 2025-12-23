@@ -2,8 +2,7 @@
 # 1-depth 섹션만 사용 (nested 최소)
 
 model:
-  # name_or_path: "beomi/gemma-ko-2b"
-  name_or_path: "skt/A.X-4.0-Light"
+  name_or_path: "beomi/gemma-ko-2b"
 
 tokenizer:
   max_seq_length: 2048
@@ -11,11 +10,12 @@ tokenizer:
 
 train:
   train_path: "/data/ephemeral/home/ksat_data/train_split.csv"
-  output_dir: "./outputs_skt"
+  valid_path: "/data/ephemeral/home/ksat_data/valid_split.csv"
+  output_dir: "./outputs"
 
   # LoRA (train only)
-  lora_r: 16
-  lora_alpha: 32
+  lora_r: 8
+  lora_alpha: 16
   lora_dropout: 0.05
   lora_target_modules: ["q_proj", "v_proj"]
 
@@ -25,17 +25,17 @@ train:
   gradient_accumulation_steps: 4
   learning_rate: 5e-6
   lr_scheduler_type: "cosine"
-  num_train_epochs: 5
+  num_train_epochs: 1
 
   fp16: true
   gradient_checkpointing: false
   seed: 42
   weight_decay: 0.01
-  report_to: "wandb"  # none | wandb | tensorboard
+  report_to: "none"  # none | wandb | tensorboard
 
 infer:
   test_path: "/data/ephemeral/home/ksat_data/valid_split.csv"
-  output_path: "output.csv"
+  output_path: "pred_gemma.csv"
 
   # adapter_path가 null이면 {train.output_dir}/final_adapter 사용 (코드에서)
   use_adapter: true
@@ -44,4 +44,4 @@ infer:
 wandb:
   project: "koreasat_yejoon"
   entity: "hakiful-ai"
-  name: "skt/A.X-4.0-Light_balanced_right_padded"
+  name: "beomi/gemma-ko-2b_balanced"

@@ -15,6 +15,7 @@ from peft import (
 )
 
 from ..configs.schema import Config
+from common.tokenization.chat_template import GEMMA_CHAT_TEMPLATE
 
 
 def _resolve_torch_dtype(cfg: Config) -> torch.dtype:
@@ -36,6 +37,9 @@ def _load_tokenizer(
 
     tokenizer.padding_side = padding_side
     tokenizer.model_max_length = max_seq_length
+    
+    if tokenizer.chat_template is None:
+        tokenizer.chat_template = GEMMA_CHAT_TEMPLATE
 
     return tokenizer
 

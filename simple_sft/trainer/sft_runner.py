@@ -24,6 +24,7 @@ class SFTTrainingRunner:
         eval_dataset: Any,
         peft_config: Any | None = None,
         metrics: Any | None = None,
+        data_collator: Any | None = None, 
     ) -> None:
         if config.train is None:
             raise ValueError("config.training is required for training")
@@ -35,6 +36,7 @@ class SFTTrainingRunner:
         self.eval_dataset = eval_dataset
         self.peft_config = peft_config
         self.metrics = metrics
+        self.data_collator = data_collator
 
         self._trainer: SFTTrainer | None = None
 
@@ -71,6 +73,7 @@ class SFTTrainingRunner:
             run_name=run_name,
             save_only_model=True,
             seed=train.seed,
+            remove_unused_columns=False,
         )
 
     def build_trainer(self) -> SFTTrainer:
@@ -90,11 +93,13 @@ class SFTTrainingRunner:
             train_dataset=self.train_dataset,
             eval_dataset=self.eval_dataset,
             processing_class=self.tokenizer,
+            data_collator=self.data_collator,
             compute_metrics=(self.metrics.compute_metrics if self.metrics else None),
             preprocess_logits_for_metrics=(
                 self.metrics.preprocess_logits_for_metrics if self.metrics else None
             ),
             peft_config=self.peft_config,
+            
             args=args,
         )
         return self._trainer
