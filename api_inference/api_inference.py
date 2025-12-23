@@ -87,7 +87,8 @@ async def process_single_item(
     item: dict,
     system_prompt: str,
     semaphore: asyncio.Semaphore,
-    use_type_specific_prompt: bool = True
+    use_type_specific_prompt: bool = True,
+    use_cot: bool = False
 ) -> dict:
     """
     단일 문제 처리 (비동기) - 파싱 실패 시 자동 재시도
@@ -98,6 +99,7 @@ async def process_single_item(
         system_prompt: 시스템 프롬프트 (use_type_specific_prompt=False일 때 사용)
         semaphore: 동시 요청 제한용 세마포어
         use_type_specific_prompt: 문제 유형별 프롬프트 사용 여부
+        use_cot: CoT(Chain of Thought) 프롬프트 사용 여부
     
     Returns:
         결과 딕셔너리 {'id': ..., 'answer': ..., 'raw_response': ..., 'question_type': ...}
@@ -106,13 +108,14 @@ async def process_single_item(
         # 문제 유형 가져오기
         question_type = item.get('question_type', QuestionType.DEFAULT)
         
-        # 프롬프트 생성 (유형별 또는 기본)
+        # 프롬프트 생성 (유형별 또는 기본, CoT 여부)
         user_message = format_question_message(
             paragraph=item['paragraph'],
             question=item['question'],
             question_plus=item['question_plus'],
             choices_list=item['choices'],
-            question_type=question_type if use_type_specific_prompt else QuestionType.DEFAULT
+            question_type=question_type if use_type_specific_prompt else QuestionType.DEFAULT,
+            use_cot=use_cot
         )
         
         # 메시지 구성 (유형별 시스템 프롬프트 또는 기본)
@@ -238,15 +241,18 @@ async def run_api_inference_async(config_path: str, mode: str | None = None) -> 
         'system_prompt'
     )
     
+    # CoT (Chain of Thought) 프롬프트 사용 여부
+    use_cot = config['inference'].get('use_cot', False)
+    
     # 동시 요청 수 설정
     max_concurrent = config['inference'].get('max_concurrent', 40)
     semaphore = asyncio.Semaphore(max_concurrent)
     
-    print(f"Starting API Inference (max_concurrent={max_concurrent}, max_retry={MAX_RETRY}, use_type_specific_prompt={use_type_specific_prompt})...")
+    print(f"Starting API Inference (max_concurrent={max_concurrent}, max_retry={MAX_RETRY}, use_type_specific_prompt={use_type_specific_prompt}, use_cot={use_cot})...")
     
     # 모든 태스크 생성
     tasks = [
-        process_single_item(client, item, system_prompt, semaphore, use_type_specific_prompt)
+        process_single_item(client, item, system_prompt, semaphore, use_type_specific_prompt, use_cot)
         for item in test_data
     ]
     

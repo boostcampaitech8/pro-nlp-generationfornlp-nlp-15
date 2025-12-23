@@ -38,6 +38,109 @@ class QuestionType(Enum):
 
 # ===== 유형별 프롬프트 템플릿 (api_inference 전용 확장) =====
 
+# ===== CoT (Chain of Thought) 프롬프트 =====
+# 추론 과정을 먼저 서술하고, 마지막에 "정답: {숫자}" 형식으로 출력
+
+COT_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+위 문제를 풀기 위해 다음 단계를 따르세요:
+1. 지문의 핵심 내용을 파악하세요.
+2. 각 선택지가 지문의 내용과 일치하는지 하나씩 분석하세요.
+3. 분석 결과를 바탕으로 정답을 도출하세요.
+
+추론 과정을 먼저 서술한 후, 반드시 마지막 줄에 "정답: [숫자]" 형식으로 답을 출력하세요.
+"""
+
+COT_MULTI_LABEL_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 ㄱ, ㄴ, ㄷ, ㄹ 등의 보기 중 옳은 것을 모두 고르는 유형입니다.
+
+다음 단계를 따라 풀이하세요:
+1. 각 보기(ㄱ, ㄴ, ㄷ, ㄹ)의 내용을 지문에 비추어 옳은지 하나씩 판단하세요.
+2. 옳은 보기들을 정리하세요.
+3. 옳은 보기들의 조합에 해당하는 선택지 번호를 찾으세요.
+
+추론 과정을 먼저 서술한 후, 반드시 마지막 줄에 "정답: [숫자]" 형식으로 답을 출력하세요.
+"""
+
+COT_SINGLE_CORRECT_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 선택지 중 옳은 것 또는 옳지 않은 것을 고르는 유형입니다.
+
+다음 단계를 따라 풀이하세요:
+1. 질문이 "옳은 것"을 찾는지 "옳지 않은 것"을 찾는지 확인하세요.
+2. 각 선택지가 지문의 내용과 일치하는지 하나씩 분석하세요.
+3. 질문의 요구에 맞는 선택지를 찾으세요.
+
+추론 과정을 먼저 서술한 후, 반드시 마지막 줄에 "정답: [숫자]" 형식으로 답을 출력하세요.
+"""
+
+COT_SEQUENCE_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 사건이나 내용을 시간 순서대로 나열하는 유형입니다.
+
+다음 단계를 따라 풀이하세요:
+1. 지문에서 각 사건(가), (나), (다), (라)의 내용을 파악하세요.
+2. 역사적 사실과 지문을 바탕으로 각 사건의 시기를 추정하세요.
+3. 시간 순서대로 정렬하여 올바른 배열을 찾으세요.
+
+추론 과정을 먼저 서술한 후, 반드시 마지막 줄에 "정답: [숫자]" 형식으로 답을 출력하세요.
+"""
+
+COT_FILL_BLANK_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 빈칸에 들어갈 알맞은 내용을 고르는 유형입니다.
+
+다음 단계를 따라 풀이하세요:
+1. 지문의 전체적인 맥락과 흐름을 파악하세요.
+2. 빈칸 앞뒤의 문맥을 분석하세요.
+3. 각 선택지를 빈칸에 대입하여 가장 적절한 것을 찾으세요.
+
+추론 과정을 먼저 서술한 후, 반드시 마지막 줄에 "정답: [숫자]" 형식으로 답을 출력하세요.
+"""
+
+# CoT 유형별 프롬프트 매핑
+COT_PROMPT_TEMPLATES = {
+    QuestionType.MULTI_LABEL: COT_MULTI_LABEL_PROMPT_FORMAT,
+    QuestionType.SINGLE_CORRECT: COT_SINGLE_CORRECT_PROMPT_FORMAT,
+    QuestionType.SEQUENCE: COT_SEQUENCE_PROMPT_FORMAT,
+    QuestionType.FILL_BLANK: COT_FILL_BLANK_PROMPT_FORMAT,
+    QuestionType.DEFAULT: COT_PROMPT_FORMAT,
+}
+
+
+# ===== 기본 프롬프트 (숫자만 출력) =====
+
 # 기본 프롬프트 - common 기반으로 api_inference용 꼬리 문구 추가
 BASE_PROMPT_FORMAT = """지문:
 {paragraph}
@@ -226,7 +329,8 @@ def format_question_message(
     question: str,
     question_plus: Any,
     choices_list: List[str],
-    question_type: QuestionType = None
+    question_type: QuestionType = None,
+    use_cot: bool = False
 ) -> str:
     """
     <보기> 유무를 자동으로 판단하여 최종 프롬프트를 생성합니다.
@@ -238,6 +342,7 @@ def format_question_message(
         question_plus: <보기> 텍스트 (없을 수 있음)
         choices_list: 선택지 리스트
         question_type: 문제 유형 (None이면 자동 분류)
+        use_cot: True면 CoT 프롬프트 사용, False면 기본 프롬프트 사용
     
     Returns:
         포맷팅된 프롬프트 문자열
@@ -255,8 +360,11 @@ def format_question_message(
     else:
         question_content = f"질문:\n{question}"
     
-    # 유형별 프롬프트 템플릿 선택
-    prompt_template = PROMPT_TEMPLATES.get(question_type, BASE_PROMPT_FORMAT)
+    # 프롬프트 템플릿 선택 (CoT 또는 기본)
+    if use_cot:
+        prompt_template = COT_PROMPT_TEMPLATES.get(question_type, COT_PROMPT_FORMAT)
+    else:
+        prompt_template = PROMPT_TEMPLATES.get(question_type, BASE_PROMPT_FORMAT)
     
     return prompt_template.format(
         paragraph=paragraph,
