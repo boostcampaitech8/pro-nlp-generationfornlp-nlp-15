@@ -110,8 +110,9 @@ def main() -> None:
     # 추론 결과 Artifact 업로드
     if wandb.run is not None:
         log.info("Uploading inference results to WandB Artifacts...")
+        run_name = wandb.run.name.replace("/", "-")
         artifact = wandb.Artifact(
-            name=f"{wandb.run.name or 'inference'}-result",
+            name=f"{run_name or 'inference'}-result",
             type="result",
             description="Inference output CSV",
         )
