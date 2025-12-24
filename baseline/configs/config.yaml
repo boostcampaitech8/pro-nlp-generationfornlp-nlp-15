@@ -37,6 +37,7 @@ infer:
   output_path: "output.csv"
 
   # adapter_path가 null이면 {train.output_dir}/final_adapter 사용 (코드에서)
+  # adapter_path에 artifact 주소가 있을 경우, 클라우드에 저장된 모델 사용
   use_adapter: true
   adapter_path: null
 
