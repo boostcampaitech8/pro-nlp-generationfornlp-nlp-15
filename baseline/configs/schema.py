@@ -29,6 +29,7 @@ class TrainConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     train_path: Path
+    eval_path: Path | None = None
     output_dir: Path
 
     # LoRA (train only) - 1-depth 유지: nested 없이 train 내부에 flat로 둠
@@ -88,7 +89,6 @@ class WandBConfig(BaseModel):
     group: str | None = None
     job_type: str | None = None
     notes: str | None = None
-    tags: list[str] | None = None
 
 
 class Config(BaseModel):

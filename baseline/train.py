@@ -47,19 +47,38 @@ def main() -> None:
     log.info("Loading model/tokenizer...")
     model, tokenizer, peft_config = load_for_train(config)
 
-    # 5) dataset (single CSV -> train/val split)
+    # 5) dataset (single CSV -> train/val split OR separate files)
     log.info("Building datasets...")
-    ds = load_text_qa_dataset(
-        file_path=str(config.train.train_path),
-        tokenizer=tokenizer,
-        require_answer=True,
-    )
-    split = ds.train_test_split(
-        test_size=0.1,
-        seed=config.train.seed,
-    )
-    train_ds = split["train"]
-    val_ds = split["test"]
+
+    if config.train.eval_path:
+        # Pre-split case
+        log.info(f"Loading train from {config.train.train_path}")
+        train_ds = load_text_qa_dataset(
+            file_path=str(config.train.train_path),
+            tokenizer=tokenizer,
+            require_answer=True,
+        )
+        log.info(f"Loading valid from {config.train.eval_path}")
+        val_ds = load_text_qa_dataset(
+            file_path=str(config.train.eval_path),
+            tokenizer=tokenizer,
+            require_answer=True,
+        )
+    else:
+        # Runtime split case
+        log.info(f"Loading train from {config.train.train_path} and splitting")
+        ds = load_text_qa_dataset(
+            file_path=str(config.train.train_path),
+            tokenizer=tokenizer,
+            require_answer=True,
+        )
+        split = ds.train_test_split(
+            test_size=0.1,
+            seed=config.train.seed,
+        )
+        train_ds = split["train"]
+        val_ds = split["test"]
+
     log.info("Dataset sizes: train=%d val=%d", len(train_ds), len(val_ds))
 
     # 6) metrics

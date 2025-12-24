@@ -10,6 +10,7 @@ tokenizer:
 
 train:
   train_path: "/data/ephemeral/home/data/train.csv"
+  # eval_path: "/data/ephemeral/home/data/valid.csv"
   output_dir: "./outputs"
 
   # LoRA (train only)
