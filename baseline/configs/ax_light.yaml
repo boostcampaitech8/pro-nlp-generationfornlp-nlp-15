@@ -43,6 +43,9 @@ infer:
   adapter_path: null
 
 wandb:
-  project: "koreasat_yejoon"
+  project: "koreasat_woohyun"
   entity: "hakiful-ai"
   name: "skt/A.X-4.0-Light_v3"
+  group: "skt/A.X-4.0-Light_v3"
+  job_type: "train"
+  notes: "예준님 실험과 비교를 위해 동일한 데이터인 사전에 train, eval splitted된 balanced data를 사용해 진행"

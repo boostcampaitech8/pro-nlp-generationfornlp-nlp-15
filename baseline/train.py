@@ -37,6 +37,9 @@ def main() -> None:
             project=wandb_conf.project,
             entity=wandb_conf.entity,
             name=wandb_conf.name,
+            group=wandb_conf.group,
+            job_type=wandb_conf.job_type,
+            notes=wandb_conf.notes,
             override=False,
         )
 

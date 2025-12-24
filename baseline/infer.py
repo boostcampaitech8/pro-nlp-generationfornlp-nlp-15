@@ -32,12 +32,16 @@ def main() -> None:
     log = logging.getLogger(__name__)
     log.info("Loaded config: %s", args.config)
 
+    # 3) wandb config
     wandb_conf = config.wandb
     if wandb_conf is not None:
         set_wandb_env(
             project=wandb_conf.project,
             entity=wandb_conf.entity,
             name=wandb_conf.name,
+            group=wandb_conf.group,
+            job_type=wandb_conf.job_type,
+            notes=wandb_conf.notes,
             override=False,
         )
 
