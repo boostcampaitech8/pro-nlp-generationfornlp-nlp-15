@@ -10,6 +10,7 @@ tokenizer:
 
 train:
   train_path: "/data/ephemeral/home/data/train.csv"
+  # eval path가 없다면 train data split, 있다면 split 하지 않음.
   # eval_path: "/data/ephemeral/home/data/valid.csv"
   output_dir: "./outputs"
 
