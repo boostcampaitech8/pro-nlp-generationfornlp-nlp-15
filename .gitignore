@@ -5,6 +5,7 @@
 # data: symbolic link 용
 data 
 data/
+notebook/
 uv.lock
 
 ### Git ###

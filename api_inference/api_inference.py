@@ -22,7 +22,7 @@ from .utils.data_loader import (
     QuestionType, SYSTEM_PROMPTS, get_question_type_stats,
     compute_f1_by_question_type, print_evaluation_report
 )
-from .utils.output_handler import save_results_with_raw
+from .utils.output_handler import save_results_with_raw, StreamingResultSaver
 from common.utils.wandb import set_wandb_env
 from common.utils.logger import setup_logging
 
@@ -248,20 +248,44 @@ async def run_api_inference_async(config_path: str, mode: str | None = None) -> 
     max_concurrent = config['inference'].get('max_concurrent', 40)
     semaphore = asyncio.Semaphore(max_concurrent)
     
-    print(f"Starting API Inference (max_concurrent={max_concurrent}, max_retry={MAX_RETRY}, use_type_specific_prompt={use_type_specific_prompt}, use_cot={use_cot})...")
+    # 배치 저장 크기 (기본값: 50)
+    save_batch_size = config['inference'].get('save_batch_size', 50)
     
-    # 모든 태스크 생성
-    tasks = [
-        process_single_item(client, item, system_prompt, semaphore, use_type_specific_prompt, use_cot)
-        for item in test_data
-    ]
+    # 실시간 저장 모드 사용 여부
+    use_streaming_save = config['inference'].get('use_streaming_save', True)
     
-    # 병렬 실행 with progress bar
-    results = await tqdm_asyncio.gather(*tasks, desc="Inference")
+    print(f"Starting API Inference (max_concurrent={max_concurrent}, max_retry={MAX_RETRY}, use_type_specific_prompt={use_type_specific_prompt}, use_cot={use_cot}, streaming_save={use_streaming_save})...")
     
-    # ID 순서대로 정렬 (원래 순서 유지)
-    id_order = {item['id']: idx for idx, item in enumerate(test_data)}
-    results = sorted(results, key=lambda x: id_order[x['id']])
+    if use_streaming_save:
+        # 실시간/배치 저장 모드
+        saver = StreamingResultSaver(config['data']['output_dir'], batch_size=save_batch_size)
+        
+        async def process_and_save(item):
+            result = await process_single_item(client, item, system_prompt, semaphore, use_type_specific_prompt, use_cot)
+            saver.add_result(result)
+            return result
+        
+        tasks = [process_and_save(item) for item in test_data]
+        results = await tqdm_asyncio.gather(*tasks, desc="Inference")
+        
+        # 남은 결과 저장 및 최종화
+        output_path, raw_output_path = saver.finalize(type_stats)
+    else:
+        # 기존 방식: 한 번에 저장
+        tasks = [
+            process_single_item(client, item, system_prompt, semaphore, use_type_specific_prompt, use_cot)
+            for item in test_data
+        ]
+        results = await tqdm_asyncio.gather(*tasks, desc="Inference")
+        
+        # ID 순서대로 정렬 (원래 순서 유지)
+        id_order = {item['id']: idx for idx, item in enumerate(test_data)}
+        results = sorted(results, key=lambda x: id_order[x['id']])
+        
+        # 결과 저장
+        output_path, raw_output_path = save_results_with_raw(
+            results, config['data']['output_dir'], type_stats
+        )
     
     # 파싱 실패 통계
     failed_count = sum(1 for r in results if r['answer'] == "0")
@@ -304,10 +328,6 @@ async def run_api_inference_async(config_path: str, mode: str | None = None) -> 
             
             logger.info("Metrics logged to WandB")
     
-    # 결과 저장 (output.csv + output_raw.csv + output_type.csv)
-    output_path, raw_output_path = save_results_with_raw(
-        results, config['data']['output_dir'], type_stats
-    )
     logger.info(f"Results saved to: {output_path}")
     logger.info(f"Raw responses saved to: {raw_output_path}")
     print(f"  - Results saved to: {output_path}")
