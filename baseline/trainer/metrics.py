@@ -135,8 +135,7 @@ class CustomMetrics:
                     valid_indices.append(idx)
                 else:
                     # 1~5가 아닌 경우 (이상한 토큰)
-                    parsed_labels.append(-1)
-                    valid_indices.append(idx)
+                    continue
 
         # 디버깅: 결과 출력
         print(
