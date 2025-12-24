@@ -11,6 +11,8 @@ from transformers.modeling_utils import PreTrainedModel
 from ..configs.schema import Config
 from common.tokenization.chat_template import GEMMA_CHAT_TEMPLATE
 
+import wandb
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,15 +68,17 @@ class SFTTrainingRunner:
             tf32=train.tf32,
             gradient_checkpointing=train.gradient_checkpointing,
             max_length=tokenizer.max_seq_length,
-            # [변경 1] 데이터셋이 Chat 포맷(List[Dict])이라면 text 필드 지정 불필요 (자동 감지)
-            # 만약 데이터셋 컬럼명이 'messages'가 아니라면 dataset_text_field 또는 dataset_kwargs로 매핑 필요
-            # dataset_text_field="text",
             report_to=report_to,
             run_name=run_name,
             save_only_model=True,
             seed=train.seed,
-            # [변경 2] 이 옵션을 켜면 Chat Template을 분석해 Assistant 응답만 학습
+            # 이 옵션을 켜면 Chat Template을 분석해 Assistant 응답만 학습
             completion_only_loss=True,
+            # 가장 좋은 모델 하나만 유지하기 위해 eval_loss를 기준 평가지표로 선정
+            load_best_model_at_end=True,
+            metric_for_best_model="eval_loss",
+            greater_is_better=False,
+            # save_strategy가 epoch/steps일 때 작동
         )
 
     def build_trainer(self) -> SFTTrainer:
@@ -124,4 +128,21 @@ class SFTTrainingRunner:
         self.tokenizer.save_pretrained(str(out_dir))
 
         logger.info("Saved final adapter to %s", out_dir)
+
+        # WandB Artifact 업로드: eval_loss가 가장 낮았던 가중치를 업로드합니다.
+        if (
+            self.config.train.report_to == "wandb"
+            and wandb is not None
+            and wandb.run is not None
+        ):
+            logger.info("Uploading adapter to WandB Artifacts...")
+            artifact = wandb.Artifact(
+                name=f"{wandb.run.name or 'model'}-adapter",
+                type="model",
+                description="Final (best) LoRA adapter",
+            )
+            artifact.add_dir(str(out_dir))
+            wandb.log_artifact(artifact)
+            logger.info("Artifact uploaded successfully.")
+
         return out_dir

@@ -85,6 +85,10 @@ class WandBConfig(BaseModel):
     project: str | None = None
     entity: str | None = None
     name: str | None = None
+    group: str | None = None
+    job_type: str | None = None
+    notes: str | None = None
+    tags: list[str] | None = None
 
 
 class Config(BaseModel):

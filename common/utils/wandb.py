@@ -9,7 +9,6 @@ def set_wandb_env(
     group: str | None = None,
     job_type: str | None = None,
     notes: str | None = None,
-    tags: list[str] | None = None,
     override: bool = False,
 ) -> None:
     """

@@ -14,6 +14,8 @@ from common.utils.logger import setup_logging
 from common.utils.wandb import set_wandb_env
 from common.data.load_dataset import load_tokenized_qa_dataset
 
+import wandb
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -44,6 +46,11 @@ def main() -> None:
             notes=wandb_conf.notes,
             override=False,
         )
+        wandb.init()
+    else:
+        log.warning(
+            "WandB settings not found in config. Skipping WandB initialization."
+        )
 
     # 4) model + tokenizer (+ adapter)
     adapter_path = None
@@ -51,6 +58,15 @@ def main() -> None:
         adapter_path = config.infer.adapter_path or (
             Path(config.train.output_dir) / "final_adapter"
         )
+
+        # adapter_path가 WandB Artifact 형식인 경우 다운로드(Artifact 형식: entity/project/name:version)
+        if str(adapter_path).count("/") >= 2 and ":" in str(adapter_path):
+            if wandb.run is None:
+                wandb.init()
+            log.info(f"Downloading adapter from WandB Artifact: {adapter_path}")
+            artifact = wandb.use_artifact(str(adapter_path), type="model")
+            adapter_path = artifact.download()
+            log.info(f"Downloaded to: {adapter_path}")
 
     model, tokenizer = load_for_infer(config, adapter_path=adapter_path)
     model.eval()
@@ -90,6 +106,19 @@ def main() -> None:
     pd.DataFrame(results).to_csv(out_path, index=False)
     log.info("Saved: %s", out_path)
     print(f"[done] saved: {out_path}")
+
+    # 추론 결과 Artifact 업로드
+    if wandb.run is not None:
+        log.info("Uploading inference results to WandB Artifacts...")
+        artifact = wandb.Artifact(
+            name=f"{wandb.run.name or 'inference'}-result",
+            type="result",
+            description="Inference output CSV",
+        )
+        artifact.add_file(str(out_path))
+        wandb.log_artifact(artifact)
+        log.info("Result artifact uploaded.")
+        wandb.finish()
 
 
 if __name__ == "__main__":
