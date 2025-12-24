@@ -136,8 +136,10 @@ class SFTTrainingRunner:
             and wandb.run is not None
         ):
             logger.info("Uploading adapter to WandB Artifacts...")
+
+            run_name = wandb.run.name.replace("/", "-")
             artifact = wandb.Artifact(
-                name=f"{wandb.run.name or 'model'}-adapter",
+                name=f"{run_name or 'model'}-adapter",
                 type="model",
                 description="Final (best) LoRA adapter",
             )
