@@ -14,7 +14,6 @@ from .models.loader import load_for_infer
 from common.utils.logger import setup_logging
 from common.utils.wandb import set_wandb_env
 from common.data.load_dataset import load_qa_dataset_tokenized
-from common.data.chat_tokenizer import tokenize_prompt_only
 
 
 def parse_args() -> argparse.Namespace:

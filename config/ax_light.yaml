@@ -26,7 +26,7 @@ train:
   gradient_accumulation_steps: 4
   learning_rate: 5e-6
   lr_scheduler_type: "cosine"
-  num_train_epochs: 5
+  num_train_epochs: 10
 
   fp16: true
   gradient_checkpointing: false

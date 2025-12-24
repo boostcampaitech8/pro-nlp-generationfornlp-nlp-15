@@ -5,7 +5,7 @@ model:
   name_or_path: "beomi/gemma-ko-2b"
 
 tokenizer:
-  max_seq_length: 2048
+  max_seq_length: 5000
   padding_side: "right"
 
 train:
@@ -23,7 +23,7 @@ train:
   per_device_train_batch_size: 1
   per_device_eval_batch_size: 1
   gradient_accumulation_steps: 4
-  learning_rate: 2e-5
+  learning_rate: 5e-6
   lr_scheduler_type: "cosine"
   num_train_epochs: 5
 
@@ -34,7 +34,7 @@ train:
   report_to: "wandb"  # none | wandb | tensorboard
 
 infer:
-  test_path: "/data/ephemeral/home/ksat_data/valid_split.csv"
+  test_path: "/data/ephemeral/home/ksat_data/test.csv"
   output_path: "pred_gemma.csv"
 
   # adapter_path가 null이면 {train.output_dir}/final_adapter 사용 (코드에서)
@@ -44,4 +44,4 @@ infer:
 wandb:
   project: "koreasat_yejoon"
   entity: "hakiful-ai"
-  name: "beomi/gemma-ko-2b_v1"
+  name: "beomi/gemma-ko-2b_v3"

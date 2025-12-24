@@ -41,8 +41,8 @@ logs/
 **/logs/
 
 # === Outputs / Checkpoints ===
-outputs/
-output/
+outputs*/
+output*/
 checkpoints/
 runs/
 wandb/
