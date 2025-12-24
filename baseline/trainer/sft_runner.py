@@ -9,7 +9,7 @@ from transformers import PreTrainedTokenizerBase
 from transformers.modeling_utils import PreTrainedModel
 
 from ..configs.schema import Config
-from common.tokenization.chat_template import GEMMA_CHAT_TEMPLATE
+
 
 import wandb
 
@@ -90,8 +90,6 @@ class SFTTrainingRunner:
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
-
-        self.tokenizer.chat_template = GEMMA_CHAT_TEMPLATE
 
         args = self.build_sft_config()
 
