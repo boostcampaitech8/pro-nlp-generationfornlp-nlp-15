@@ -33,7 +33,3 @@ def set_wandb_env(
         ]  # locals() 결과: 함수의 파라미터 이름이 key, 값이 value인 딕셔너리
         if value and (override or env_var not in os.environ):
             os.environ[env_var] = value
-
-    # list 형태를 받는 tags 파라미터
-    if tags and (override or "WANDB_TAGS" not in os.environ):
-        os.environ["WANDB_TAGS"] = ",".join(tags)
