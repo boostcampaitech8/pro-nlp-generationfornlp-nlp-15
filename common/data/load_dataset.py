@@ -40,6 +40,8 @@ def load_text_qa_dataset(
 
         # prompt: system + user 메시지 (assistant 제외)
         # add_generation_prompt=True로 <start_of_turn>model\n 까지 포함
+        # prompt: system + user messages
+        # add_generation_prompt=True ensures we stop right before the assistant's turn
         prompt_messages = [m for m in messages if m["role"] != "assistant"]
         prompt = tokenizer.apply_chat_template(
             prompt_messages,
@@ -47,11 +49,21 @@ def load_text_qa_dataset(
             add_generation_prompt=True,
         )
 
-        # completion: assistant 응답 + <end_of_turn>\n
-        assistant_message = next(
-            (m["content"] for m in messages if m["role"] == "assistant"), ""
+        # completion: derive by generating full text and subtracting prompt
+        full_text = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
         )
-        completion = assistant_message + "<end_of_turn>\n"
+
+        if full_text.startswith(prompt):
+            completion = full_text[len(prompt) :]
+        else:
+            # Fallback for templates that might change formatting slightly (rare but safe to handle)
+            # If strictly non-matching, we just take the assistant content + eos
+            assistant_content = next(
+                (m["content"] for m in messages if m["role"] == "assistant"), ""
+            )
+            completion = assistant_content + tokenizer.eos_token
 
         data.append({"prompt": prompt, "completion": completion})
 

@@ -17,15 +17,6 @@ from peft import (
 from ..configs.schema import Config
 
 
-GEMMA_CHAT_TEMPLATE = (
-    "{% if messages[0]['role'] == 'system' %}{% set system_message = messages[0]['content'] %}{% endif %}"
-    "{% if system_message is defined %}{{ system_message }}{% endif %}"
-    "{% for message in messages %}{% set content = message['content'] %}"
-    "{% if message['role'] == 'user' %}{{ '<start_of_turn>user\n' + content + '<end_of_turn>\n<start_of_turn>model\n' }}"
-    "{% elif message['role'] == 'assistant' %}{{ content + '<end_of_turn>\n' }}{% endif %}{% endfor %}"
-)
-
-
 def _resolve_torch_dtype(cfg: Config) -> torch.dtype:
     if cfg.train is not None:
         if cfg.train.bf16:
@@ -43,14 +34,6 @@ def _load_tokenizer(
 ) -> PreTrainedTokenizerBase:
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
-    # 특수 토큰 등록 (단일 토큰으로 처리되도록)
-    if add_special_tokens:
-        special_tokens = {
-            "additional_special_tokens": ["<start_of_turn>", "<end_of_turn>"]
-        }
-        tokenizer.add_special_tokens(special_tokens)
-
-    tokenizer.chat_template = GEMMA_CHAT_TEMPLATE
     if not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -93,7 +76,6 @@ def load_for_train(
     )
 
     # 특수 토큰 추가에 따른 임베딩 리사이즈
-    model.resize_token_embeddings(len(tokenizer))
 
     if config.train.gradient_checkpointing:
         model.gradient_checkpointing_enable()
@@ -133,7 +115,6 @@ def load_for_infer(
     )
 
     # 특수 토큰 추가에 따른 임베딩 리사이즈
-    model.resize_token_embeddings(len(tokenizer))
 
     if adapter_path is not None:
         model = PeftModel.from_pretrained(model, adapter_path)

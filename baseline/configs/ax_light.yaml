@@ -10,8 +10,8 @@ tokenizer:
   padding_side: "right"
 
 train:
-  train_path: "/data/ephemeral/home/ksat_data/train.csv"
-  valid_path: "/data/ephemeral/home/ksat_data/valid.csv"
+  train_path: "./train.csv"
+  eval_path: "./valid.csv"
   output_dir: "./outputs_skt"
 
   # LoRA (train only)
