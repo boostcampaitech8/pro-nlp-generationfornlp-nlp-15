@@ -2,8 +2,7 @@
 # 1-depth 섹션만 사용 (nested 최소)
 
 model:
-  # name_or_path: "beomi/gemma-ko-2b"
-  name_or_path: "skt/A.X-4.0-Light"
+  name_or_path: "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct"
 
 tokenizer:
   max_seq_length: 10000
@@ -12,7 +11,7 @@ tokenizer:
 train:
   train_path: "/data/ephemeral/home/ksat_data/train.csv"
   valid_path: "/data/ephemeral/home/ksat_data/valid.csv"
-  output_dir: "./outputs_skt"
+  output_dir: "./outputs_exaone"
 
   # LoRA (train only)
   lora_r: 16
@@ -45,4 +44,4 @@ infer:
 wandb:
   project: "koreasat_yejoon"
   entity: "hakiful-ai"
-  name: "skt/A.X-4.0-Light_v4"
+  name: "LGAI-EXAONE/EXAONE-3.5-7.8B_v3"

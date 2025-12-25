@@ -43,6 +43,7 @@ def load_qa_dataset_tokenized(
         data_dict = {
             "input_ids": enc["input_ids"],
             "attention_mask": enc["attention_mask"],
+            "sample_id": ex.id,
         }
          
         if include_answer:

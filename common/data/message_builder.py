@@ -20,9 +20,4 @@ def build_chat_messages(example: QAExample, include_answer: bool=False) -> dict[
         {"role": "user", "content": user_message},
     ]
 
-    if include_answer and example.answer is not None:
-        messages.append(
-            {"role": "assistant", "content": example.answer}
-        )
-
     return {"messages": messages}

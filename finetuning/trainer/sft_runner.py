@@ -8,6 +8,8 @@ from trl import SFTConfig, SFTTrainer
 from transformers import PreTrainedTokenizerBase
 from transformers.modeling_utils import PreTrainedModel
 
+from .callbacks import EvalPredictCallback
+
 from ..configs.schema import Config
 
 logger = logging.getLogger(__name__)
@@ -87,6 +89,10 @@ class SFTTrainingRunner:
         self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
 
         args = self.build_sft_config()
+        
+        callbacks = [
+            EvalPredictCallback(self)
+        ]
 
         self._trainer = SFTTrainer(
             model=self.model,
@@ -99,7 +105,7 @@ class SFTTrainingRunner:
                 self.metrics.preprocess_logits_for_metrics if self.metrics else None
             ),
             peft_config=self.peft_config,
-            
+            callbacks=callbacks,
             args=args,
         )
         return self._trainer
@@ -120,3 +126,56 @@ class SFTTrainingRunner:
 
         logger.info("Saved final adapter to %s", out_dir)
         return out_dir
+
+    def run_eval_prediction(self, trainer, tag: str):
+        """
+        현재 모델 상태로 eval_dataset 전체를 predict하고
+        문제 단위 CSV 로그를 저장한다.
+        """
+        logger.info("[EvalPredict] running eval prediction (%s)", tag)
+
+        output = trainer.predict(self.eval_dataset)
+
+        logits = output.predictions      # (N, T, 5)
+        labels = output.label_ids        # (N, T)
+
+        sample_ids = self.eval_dataset["sample_id"]
+        input_ids = self.eval_dataset["input_ids"]
+
+        rows = []
+
+        for i in range(len(sample_ids)):
+            label_row = labels[i]
+            pos = (label_row != -100).nonzero()[0]
+            if len(pos) != 1:
+                continue
+            p = pos[0]
+
+            class_logits = logits[i, p, :]
+            pred = int(class_logits.argmax())
+
+            gold_token_id = int(label_row[p])
+            gold = self.metrics.logit_token_ids.index(gold_token_id)
+
+            prompt = self.tokenizer.decode(
+                input_ids[i][:p],
+                skip_special_tokens=False,
+            )
+
+            rows.append([
+                sample_ids[i],
+                gold,
+                pred,
+                gold == pred,
+                prompt,
+            ])
+
+        # CSV 저장
+        out_path = Path(self.config.train.output_dir) / f"eval_{tag}.csv"
+        with out_path.open("w", encoding="utf-8") as f:
+            import csv
+            writer = csv.writer(f)
+            writer.writerow(["sample_id", "gold", "pred", "correct", "prompt"])
+            writer.writerows(rows)
+
+        logger.info("[EvalPredict] saved %d rows to %s", len(rows), out_path)
