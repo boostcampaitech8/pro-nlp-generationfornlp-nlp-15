@@ -1,3 +1,5 @@
+from unsloth import FastLanguageModels
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,8 +17,6 @@ from peft import (
 )
 
 from ..configs.schema import Config
-
-from unsloth import FastLanguageModel
 
 
 def _resolve_torch_dtype(cfg: Config) -> torch.dtype:
