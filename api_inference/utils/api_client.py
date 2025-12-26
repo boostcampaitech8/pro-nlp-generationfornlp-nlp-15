@@ -4,10 +4,22 @@ OpenAI API 호환 클라이언트 모듈
 - 동기/비동기 모두 지원
 """
 import json
-from typing import Optional, List, Dict, Any
+from typing import TypedDict, Literal, cast
 from openai import OpenAI, AsyncOpenAI
 
+## Function Call 결과 타입 정의
+class ToolCallSucess[T](TypedDict):
+    name: str
+    arguments: T
+    from_tool_call: Literal[True]
 
+class ToolCallFallback(TypedDict):
+    content: str | None
+    from_tool_call: Literal[False]
+
+type FunctionCallResult[T] = ToolCallSucess[T] | ToolCallFallback
+
+## API Client class 정의
 class APIClient:
     """OpenAPI 호환 서버용 API 클라이언트 (동기)"""
     
@@ -28,10 +40,10 @@ class APIClient:
     
     def chat_completion(
         self,
-        messages: List[Dict[str, str]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        seed: Optional[int] = None
+        messages: list[dict[str, str]], # List[Dict[str, str]],
+        temperature: float | None = None, # Optional[float] = None,
+        max_tokens: int | None = None, # Optional[int] = None,
+        seed: int | None = None # Optional[int] = None
     ) -> str:
         """
         일반 채팅 완성 요청
@@ -57,13 +69,13 @@ class APIClient:
         )
         return response.choices[0].message.content
     
-    def function_call_completion(
+    def function_call_completion[T](
         self,
-        messages: List[Dict[str, str]],
-        tools: List[Dict[str, Any]],
+        messages: list[dict[str, str]],# List[Dict[str, str]],
+        tools: list[dict[str, object]], # List[Dict[str, Any]],
         tool_choice: str = "required",
-        temperature: Optional[float] = None
-    ) -> Dict[str, Any]:
+        temperature: float | None = None # Optional[float] = None
+    ) -> FunctionCallResult[T]: # Dict[str, Any]:
         """
         Function Call 요청
         
@@ -87,7 +99,7 @@ class APIClient:
         tool_call = response.choices[0].message.tool_calls[0]
         return {
             "name": tool_call.function.name,
-            "arguments": json.loads(tool_call.function.arguments)
+            "arguments": cast(T, json.loads(tool_call.function.arguments))
         }
 
 
@@ -111,10 +123,10 @@ class AsyncAPIClient:
     
     async def chat_completion(
         self,
-        messages: List[Dict[str, str]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        seed: Optional[int] = None
+        messages: list[dict[str, str]], # List[Dict[str, str]],
+        temperature: float | None = None, # Optional[float] = None,
+        max_tokens: int | None = None, # Optional[int] = None,
+        seed: int | None = None # Optional[int] = None
     ) -> str:
         """
         비동기 채팅 완성 요청
@@ -140,13 +152,13 @@ class AsyncAPIClient:
         )
         return response.choices[0].message.content
     
-    async def function_call_completion(
+    async def function_call_completion[T](
         self,
-        messages: List[Dict[str, str]],
-        tools: List[Dict[str, Any]],
-        tool_choice: Optional[str] = None,
-        temperature: Optional[float] = None
-    ) -> Dict[str, Any]:
+        messages: list[dict[str, str]],# List[Dict[str, str]],
+        tools: list[dict[str, object]], # List[Dict[str, Any]],
+        tool_choice: str = "required",
+        temperature: float | None = None # Optional[float] = None
+    ) -> FunctionCallResult[T]: # Dict[str, Any]:
         """
         비동기 Function Call 요청
         
@@ -181,7 +193,7 @@ class AsyncAPIClient:
             tool_call = message.tool_calls[0]
             return {
                 "name": tool_call.function.name,
-                "arguments": json.loads(tool_call.function.arguments),
+                "arguments": cast(T, json.loads(tool_call.function.arguments)),
                 "from_tool_call": True
             }
         

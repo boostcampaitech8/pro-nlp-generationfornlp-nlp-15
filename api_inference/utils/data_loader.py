@@ -373,15 +373,14 @@ def format_question_message(
     )
 
 
-def load_test_data(test_path: str, skip_rows: int = 0) -> List[Dict[str, Any]]:
+def load_test_data(test_path: str) -> List[Dict[str, Any]]:
     """
     테스트 데이터 로드 및 파싱 (문제 유형 분류 포함)
     common/data/read_csv.py의 load_qa_examples_from_csv를 활용합니다.
     
     Args:
         test_path: test.csv 파일 경로
-        skip_rows: 건너뛸 행 수 (이미 처리된 행)
-    
+
     Returns:
         파싱된 테스트 데이터 리스트
         각 항목: {
@@ -395,7 +394,7 @@ def load_test_data(test_path: str, skip_rows: int = 0) -> List[Dict[str, Any]]:
             'answer': 정답 (있는 경우)
         }
     """
-    qa_examples = load_qa_examples_from_csv(test_path, skip_rows=skip_rows)
+    qa_examples = load_qa_examples_from_csv(test_path)
     
     test_data = []
     for idx, example in enumerate(qa_examples):
@@ -406,7 +405,7 @@ def load_test_data(test_path: str, skip_rows: int = 0) -> List[Dict[str, Any]]:
         )
         
         test_data.append({
-            'id': skip_rows + idx,  # 실제 인덱스 = skip_rows + 순서
+            'id': example.id if example.id is not None else idx,  
             'paragraph': example.paragraph,
             'question': example.question,
             'question_plus': example.question_plus,
