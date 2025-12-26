@@ -17,12 +17,14 @@ import yaml
 from tqdm.asyncio import tqdm_asyncio
 
 from .utils.api_client import AsyncAPIClient
-from .utils.data_loader import (
-    load_test_data, format_question_message, create_messages,
-    QuestionType, SYSTEM_PROMPTS, get_question_type_stats,
-    compute_f1_by_question_type, print_evaluation_report
+from .utils.data_loader import load_test_data, create_messages
+from .utils.metrics import (
+    get_question_type_stats,
+    compute_f1_by_question_type,
+    print_evaluation_report,
 )
 from .utils.output_handler import save_results_with_raw, StreamingResultSaver
+from .prompts import QuestionType, format_question_message, SYSTEM_PROMPTS
 from common.utils.wandb import set_wandb_env
 from common.utils.logger import setup_logging
 
@@ -158,7 +160,7 @@ async def process_single_item(
         }
 
 
-async def run_api_inference_async(config_path: str, mode: str | None = None) -> tuple:
+async def run_api_inference_async(config_path: str, mode: str | None = None, sample_size: int | None = None) -> tuple:
     """
     일반 응답 파싱 방식으로 수능 문제 추론 실행 (비동기 병렬)
     
@@ -167,6 +169,7 @@ async def run_api_inference_async(config_path: str, mode: str | None = None) -> 
         mode: "train" 또는 "test" (None이면 yaml에서 읽음)
               - train: train.csv 사용, F1 Score 계산 및 wandb 기록
               - test: test.csv 사용, 결과만 저장
+        sample_size: 테스트용 샘플 개수 제한 (None이면 전체 데이터 사용)
     
     Returns:
         (output 파일 경로, raw output 파일 경로) 튜플
@@ -225,6 +228,12 @@ async def run_api_inference_async(config_path: str, mode: str | None = None) -> 
         print(f"[Test Mode] Loading data from: {data_path}")
     
     test_data = load_test_data(data_path)
+    
+    # 샘플 수 제한: CLI 옵션 > yaml 설정
+    effective_sample_size = sample_size or config['data'].get('sample_size')
+    if effective_sample_size is not None and effective_sample_size > 0:
+        test_data = test_data[:effective_sample_size]
+        print(f"[Sample Mode] Using {len(test_data)} samples (limited to {effective_sample_size})")
     
     # 문제 유형별 통계 출력
     type_stats = get_question_type_stats(test_data)
@@ -341,15 +350,16 @@ async def run_api_inference_async(config_path: str, mode: str | None = None) -> 
     return output_path, raw_output_path
 
 
-def run_api_inference(config_path: str, mode: str | None = None) -> tuple:
+def run_api_inference(config_path: str, mode: str | None = None, sample_size: int | None = None) -> tuple:
     """
     동기 래퍼 함수
     
     Args:
         config_path: 설정 파일 경로
         mode: "train" 또는 "test" (None이면 yaml에서 읽음)
+        sample_size: 테스트용 샘플 개수 제한
     """
-    return asyncio.run(run_api_inference_async(config_path, mode))
+    return asyncio.run(run_api_inference_async(config_path, mode, sample_size))
 
 
 def main():
@@ -376,6 +386,13 @@ def main():
         help="Test 모드: test.csv로 추론 후 결과만 저장 (yaml 설정 오버라이드)"
     )
     
+    parser.add_argument(
+        "--sample",
+        type=int,
+        default=None,
+        help="테스트용 샘플 개수 제한 (예: --sample 100)"
+    )
+    
     args = parser.parse_args()
     
     # CLI에서 모드 지정했으면 사용, 아니면 None (yaml에서 읽음)
@@ -385,7 +402,7 @@ def main():
     elif args.test:
         mode = "test"
     
-    run_api_inference(args.config, mode)
+    run_api_inference(args.config, mode, sample_size=args.sample)
 
 
 if __name__ == "__main__":

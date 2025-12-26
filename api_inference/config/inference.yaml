@@ -4,7 +4,7 @@
 # 실행 모드 ("train" 또는 "test")
 # - train: train.csv 사용, F1 Score 계산, wandb 기록
 # - test: test.csv 사용, 결과만 저장
-mode: "test"
+mode: "train"
 
 api:
   base_url: "http://10.28.228.126:30449/v1"  # OpenAPI 호환 서버 URL (수정 가능)
@@ -17,6 +17,7 @@ data:
   train_path: "data/balanced_train.csv"           # 학습 데이터 경로
   test_path: "data/test.csv"             # 테스트 데이터 경로
   output_dir: "data"                     # 출력 디렉토리
+  sample_size: 100                      # 샘플 수 제한 (null이면 전체, 숫자면 해당 개수만 사용)
 
 inference:
   temperature: 0.0                         # 생성 온도 (0.0 = deterministic)
@@ -33,5 +34,5 @@ inference:
 wandb:
   project: "koreasat_jisoo_prompt"
   entity: "hakiful-ai"
-  name: "cot-base-prompt-test"
+  name: "base-prompt-sample-100"
   # "exaone-32b/exaone-32b-problem-classification-train"

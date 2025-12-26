@@ -34,6 +34,7 @@ def load_qa_examples_from_csv(file_path: str) -> list[QAExample]:
 
         examples.append(
             QAExample(
+                id=str(row["id"]),
                 paragraph=str(row["paragraph"]),
                 question=str(problem["question"]),
                 choices=[str(c) for c in problem["choices"]],
