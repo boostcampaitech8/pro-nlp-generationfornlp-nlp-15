@@ -10,20 +10,20 @@ tokenizer:
   padding_side: "right"
 
 train:
-  train_path: "train.csv"
-  eval_path: "valid.csv"
+  train_path: "/data/ephemeral/home/ksat_data/splitted/train.csv"
+  eval_path: "/data/ephemeral/home/ksat_data/splitted/valid.csv"
   output_dir: "./outputs_skt"
 
   # LoRA (train only)
   lora_r: 16
   lora_alpha: 32
   lora_dropout: 0.05
-  lora_target_modules: ["q_proj", "v_proj"]
+  lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 
   # trainer
-  per_device_train_batch_size: 1
-  per_device_eval_batch_size: 1
-  gradient_accumulation_steps: 4
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  gradient_accumulation_steps: 1
   learning_rate: 5e-6
   lr_scheduler_type: "cosine"
   num_train_epochs: 10
@@ -45,7 +45,7 @@ infer:
 wandb:
   project: "koreasat_woohyun"
   entity: "hakiful-ai"
-  name: "skt/A.X-4.0-Light_v3"
-  group: "skt/A.X-4.0-Light_v3"
+  name: "skt/A.X-4.0-Light_normal_balanced_full_lora_unsloth"
+  group: "skt/A.X-4.0-Light"
   job_type: "train"
-  notes: "예준님 실험과 비교를 위해 동일한 데이터인 사전에 train, eval splitted된 balanced data를 사용해 진행"
+  notes: "예준님 실험과 비교를 위해 동일한 데이터인 사전에 train, eval splitted된 balanced data를 사용해 진행 \n full lora \n unsloth 사용 \n final epoch \n  train"
