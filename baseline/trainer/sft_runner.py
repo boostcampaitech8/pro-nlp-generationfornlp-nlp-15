@@ -9,6 +9,8 @@ from transformers import PreTrainedTokenizerBase
 from transformers.modeling_utils import PreTrainedModel
 
 from ..configs.schema import Config
+from common.data.collator import DataCollatorForCompletionOnlyLM
+from common.utils.template import get_response_template
 
 
 import wandb
@@ -72,8 +74,10 @@ class SFTTrainingRunner:
             run_name=run_name,
             save_only_model=True,
             seed=train.seed,
-            # 이 옵션을 켜면 Chat Template을 분석해 Assistant 응답만 학습
-            completion_only_loss=True,
+            # [변경] Unsloth 호환성을 위해 completion_only_loss 자동 기능을 끄고 수동 Collator 사용
+            completion_only_loss=False,
+            # 데이터셋의 텍스트 필드 지정 (formatting_func 결과가 저장될 가상의 필드)
+            dataset_text_field="text",
             # 가장 좋은 모델 하나만 유지하기 위해 eval_loss를 기준 평가지표로 선정
             load_best_model_at_end=True,
             metric_for_best_model="eval_loss",
@@ -97,11 +101,31 @@ class SFTTrainingRunner:
         # SFTTrainer가 tokenizer.chat_template과 completion_only_loss=True 설정을 보고
         # 자동으로 user 부분은 마스킹(-100), model 부분은 학습하도록 처리
 
+        # [변경] DataCollatorForCompletionOnlyLM 수동 설정
+        # Unsloth는 formatting_func를 강제하므로, 이를 우회하면서 Masking을 하려면 Collator를 직접 써야 함
+        # 토크나이저에서 response_template 자동 감지
+        response_template = get_response_template(self.tokenizer)
+        logger.info(f"Auto-detected response_template: {repr(response_template)}")
+
+        data_collator = DataCollatorForCompletionOnlyLM(
+            response_template=response_template,
+            tokenizer=self.tokenizer,
+        )
+
+        # [변경] formatting_func 복구 (Unsloth 필수 요구사항)
+        def formatting_prompts_func(examples):
+            output_texts = []
+            for prompt, completion in zip(examples["prompt"], examples["completion"]):
+                output_texts.append(prompt + completion)
+            return output_texts
+
         self._trainer = SFTTrainer(
             model=self.model,
             train_dataset=self.train_dataset,
             eval_dataset=self.eval_dataset,
             processing_class=self.tokenizer,
+            formatting_func=formatting_prompts_func,
+            data_collator=data_collator,
             compute_metrics=(self.metrics.compute_metrics if self.metrics else None),
             preprocess_logits_for_metrics=(
                 self.metrics.preprocess_logits_for_metrics if self.metrics else None

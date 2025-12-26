@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import evaluate
 from sklearn.metrics import f1_score
+from common.utils.template import get_response_template
 
 
 class CustomMetrics:
@@ -15,8 +16,12 @@ class CustomMetrics:
         self.logit_idx = self.tokenizer.convert_tokens_to_ids(["1", "2", "3", "4", "5"])
 
         # response_template 토큰 ID (정답 직전 위치 찾기용)
-        # "<start_of_turn>model\n" 이후에 정답이 위치
-        response_template = "<start_of_turn>model\n"
+        # 자동 감지된 템플릿 사용
+        response_template = get_response_template(self.tokenizer)
+        print(
+            f"[CustomMetrics] Auto-detected response_template: {repr(response_template)}"
+        )
+
         self.response_template_ids = self.tokenizer.encode(
             response_template, add_special_tokens=False
         )

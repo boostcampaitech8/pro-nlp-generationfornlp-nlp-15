@@ -25,4 +25,5 @@ dependencies = [
   "trl==0.24.0",
   "unsloth-zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
   "unsloth[cu121-torch291] @ git+https://github.com/unslothai/unsloth.git",
+  "torchvision>=0.24.1",
 ]

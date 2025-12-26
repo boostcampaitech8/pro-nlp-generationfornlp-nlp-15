@@ -1,6 +1,5 @@
-from unsloth import FastLanguageModels
-
 from __future__ import annotations
+from unsloth import FastLanguageModel
 
 from pathlib import Path
 
