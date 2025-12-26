@@ -2,8 +2,7 @@
 # 1-depth 섹션만 사용 (nested 최소)
 
 model:
-  # name_or_path: "beomi/gemma-ko-2b"
-  name_or_path: "skt/A.X-4.0-Light"
+  name_or_path: "naver-hyperclovax/HyperCLOVAX-SEED-Think-14B"
 
 tokenizer:
   max_seq_length: 10000
@@ -25,10 +24,10 @@ train:
   per_device_eval_batch_size: 1
   gradient_accumulation_steps: 4
   learning_rate: 5e-5
-  lr_scheduler_type: "linear"
-  num_train_epochs: 3
+  lr_scheduler_type: "cosine"
+  num_train_epochs: 5
 
-  bf16: true
+  fp16: true
   gradient_checkpointing: false
   seed: 42
   weight_decay: 0.01
@@ -45,4 +44,4 @@ infer:
 wandb:
   project: "koreasat_yejoon"
   entity: "hakiful-ai"
-  name: "skt/A.X-4.0-Light_r16_lr5e-5_linear_warmup500"
+  name: "HyperCLOVAX-SEED-Think-14B_r16_lr5e-5"

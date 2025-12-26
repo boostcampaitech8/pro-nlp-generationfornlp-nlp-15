@@ -7,6 +7,10 @@ from typing import Any
 from trl import SFTConfig, SFTTrainer
 from transformers import PreTrainedTokenizerBase
 from transformers.modeling_utils import PreTrainedModel
+import torch.nn.functional as F
+import torch
+import csv
+from pathlib import Path
 
 from .callbacks import EvalPredictCallback
 
@@ -53,6 +57,7 @@ class SFTTrainingRunner:
             output_dir=str(train.output_dir),
             do_train=True,
             do_eval=True,
+            warmup_steps=500,
             num_train_epochs=train.num_train_epochs,
             learning_rate=float(train.learning_rate),
             per_device_train_batch_size=train.per_device_train_batch_size,
@@ -127,17 +132,24 @@ class SFTTrainingRunner:
         logger.info("Saved final adapter to %s", out_dir)
         return out_dir
 
+
     def run_eval_prediction(self, trainer, tag: str):
         """
         현재 모델 상태로 eval_dataset 전체를 predict하고
         문제 단위 CSV 로그를 저장한다.
+        - softmax 확률 포함
+        - sample_id / gold / pred / correctness / prompt 기록
         """
+
         logger.info("[EvalPredict] running eval prediction (%s)", tag)
 
+        # 1️⃣ eval 전체 prediction
         output = trainer.predict(self.eval_dataset)
 
-        logits = output.predictions      # (N, T, 5)
-        labels = output.label_ids        # (N, T)
+        # ⚠️ preprocess_logits_for_metrics 적용된 logits임
+        # shape: (N, T, num_classes=5)
+        logits = torch.tensor(output.predictions)
+        labels = torch.tensor(output.label_ids)
 
         sample_ids = self.eval_dataset["sample_id"]
         input_ids = self.eval_dataset["input_ids"]
@@ -146,36 +158,59 @@ class SFTTrainingRunner:
 
         for i in range(len(sample_ids)):
             label_row = labels[i]
-            pos = (label_row != -100).nonzero()[0]
+
+            # 2️⃣ 정답 위치 찾기 (label != -100)
+            pos = (label_row != -100).nonzero(as_tuple=True)[0]
             if len(pos) != 1:
                 continue
-            p = pos[0]
+            p = pos.item()
 
-            class_logits = logits[i, p, :]
-            pred = int(class_logits.argmax())
+            # 3️⃣ class logits → softmax 확률
+            class_logits = logits[i, p]          # (5,)
+            probs = F.softmax(class_logits, dim=-1)
 
-            gold_token_id = int(label_row[p])
+            pred = int(torch.argmax(probs).item())
+
+            # 4️⃣ gold label
+            gold_token_id = int(label_row[p].item())
             gold = self.metrics.logit_token_ids.index(gold_token_id)
 
+            # 5️⃣ prompt 디코딩 (answer 직전까지만)
             prompt = self.tokenizer.decode(
                 input_ids[i][:p],
                 skip_special_tokens=False,
             )
 
+            # 6️⃣ row 구성
             rows.append([
                 sample_ids[i],
                 gold,
                 pred,
                 gold == pred,
+                *[round(float(p), 6) for p in probs],  # p1~p5
                 prompt,
             ])
 
-        # CSV 저장
+        # 7️⃣ CSV 저장
         out_path = Path(self.config.train.output_dir) / f"eval_{tag}.csv"
-        with out_path.open("w", encoding="utf-8") as f:
-            import csv
+        with out_path.open("w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["sample_id", "gold", "pred", "correct", "prompt"])
+            writer.writerow([
+                "sample_id",
+                "gold",
+                "pred",
+                "correct",
+                "prob_1",
+                "prob_2",
+                "prob_3",
+                "prob_4",
+                "prob_5",
+                "prompt",
+            ])
             writer.writerows(rows)
 
-        logger.info("[EvalPredict] saved %d rows to %s", len(rows), out_path)
+        logger.info(
+            "[EvalPredict] saved %d rows to %s",
+            len(rows),
+            out_path,
+        )

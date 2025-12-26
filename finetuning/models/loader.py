@@ -53,6 +53,7 @@ def _load_base_model(
         model_name_or_path,
         torch_dtype=torch_dtype,
         device_map="auto",
+        trust_remote_code=True,
     )
 
 
