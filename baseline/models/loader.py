@@ -70,7 +70,7 @@ def load_for_train(
             model_name=config.model.name_or_path,
             max_seq_length=config.tokenizer.max_seq_length,
             dtype=_resolve_torch_dtype(config),
-            load_in_4bit=True,
+            load_in_4bit=False,  # [비교 실험] Baseline(FP16)과 동일 조건 비교를 위해 4bit 비활성화
         )
 
         # Lora
