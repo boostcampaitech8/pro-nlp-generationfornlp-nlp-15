@@ -38,8 +38,6 @@ def load_text_qa_dataset(
         messages_dict = build_chat_messages(example)
         messages = messages_dict["messages"]
 
-        # prompt: system + user 메시지 (assistant 제외)
-        # add_generation_prompt=True로 <start_of_turn>model\n 까지 포함
         # prompt: system + user messages
         # add_generation_prompt=True ensures we stop right before the assistant's turn
         prompt_messages = [m for m in messages if m["role"] != "assistant"]
