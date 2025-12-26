@@ -53,7 +53,7 @@ class TrainConfig(BaseModel):
     fp16: bool = False
     bf16: bool = False
     tf32: bool = False
-    gradient_checkpointing: bool = False
+    gradient_checkpointing: bool | Literal["unsloth"] = False
 
     logging_steps: int = Field(1, ge=1)
     evaluation_strategy: Literal["no", "steps", "epoch"] = "epoch"
@@ -63,6 +63,9 @@ class TrainConfig(BaseModel):
     seed: int = 42
     weight_decay: float = Field(0.0, ge=0.0)
     report_to: Literal["none", "wandb", "tensorboard"] = "none"
+
+    # unsloth config 추가
+    use_unsloth: bool = True
 
 
 class InferConfig(BaseModel):

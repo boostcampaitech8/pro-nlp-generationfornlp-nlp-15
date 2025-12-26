@@ -16,6 +16,8 @@ from peft import (
 
 from ..configs.schema import Config
 
+from unsloth import FastLanguageModel
+
 
 def _resolve_torch_dtype(cfg: Config) -> torch.dtype:
     if cfg.train is not None:
@@ -59,39 +61,66 @@ def load_for_train(
     config: Config,
 ) -> tuple[AutoModelForCausalLM, PreTrainedTokenizerBase]:
     """
-    Load model + tokenizer for train (LoRA applied).
+    Load model + tokenizer for train (LoRA applied, add unsloth).
     """
     assert config.train is not None, "trainConfig required for train"
 
-    torch_dtype = _resolve_torch_dtype(config)
+    # Unsloth version
+    if config.train.use_unsloth:
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=config.model.name_or_path,
+            max_seq_length=config.tokenizer.max_seq_length,
+            dtype=_resolve_torch_dtype(config),
+            load_in_4bit=True,
+        )
 
-    tokenizer = _load_tokenizer(
-        config.model.name_or_path,
-        max_seq_length=config.tokenizer.max_seq_length,
-    )
+        # Lora
+        model = FastLanguageModel.get_peft_model(
+            model=model,
+            r=config.train.lora_r,
+            lora_alpha=config.train.lora_alpha,
+            lora_dropout=config.train.lora_dropout,
+            target_modules=config.train.lora_target_modules,
+            bias="none",
+            use_gradient_checkpointing=config.train.gradient_checkpointing,  # !
+            random_state=config.train.seed,
+        )
 
-    model = _load_base_model(
-        config.model.name_or_path,
-        torch_dtype=torch_dtype,
-    )
+        tokenizer.padding_side = "right"
+        if not tokenizer.pad_token:
+            tokenizer.pad_token = tokenizer.eos_token
 
-    # 특수 토큰 추가에 따른 임베딩 리사이즈
+        return model, tokenizer, None
 
-    if config.train.gradient_checkpointing:
-        model.gradient_checkpointing_enable()
-        model.enable_input_require_grads()
+    # Normal version
+    else:
+        torch_dtype = _resolve_torch_dtype(config)
 
-    lora_cfg = LoraConfig(
-        r=config.train.lora_r,
-        lora_alpha=config.train.lora_alpha,
-        lora_dropout=config.train.lora_dropout,
-        target_modules=config.train.lora_target_modules,
-        bias="none",
-        task_type="CAUSAL_LM",
-    )
+        tokenizer = _load_tokenizer(
+            config.model.name_or_path,
+            max_seq_length=config.tokenizer.max_seq_length,
+        )
 
-    model = get_peft_model(model, lora_cfg)
-    return model, tokenizer, lora_cfg
+        model = _load_base_model(
+            config.model.name_or_path,
+            torch_dtype=torch_dtype,
+        )
+
+        if config.train.gradient_checkpointing:
+            model.gradient_checkpointing_enable()
+            model.enable_input_require_grads()
+
+        lora_cfg = LoraConfig(
+            r=config.train.lora_r,
+            lora_alpha=config.train.lora_alpha,
+            lora_dropout=config.train.lora_dropout,
+            target_modules=config.train.lora_target_modules,
+            bias="none",
+            task_type="CAUSAL_LM",
+        )
+
+        model = get_peft_model(model, lora_cfg)
+        return model, tokenizer, lora_cfg
 
 
 def load_for_infer(
@@ -113,8 +142,6 @@ def load_for_infer(
         config.model.name_or_path,
         torch_dtype=torch_dtype,
     )
-
-    # 특수 토큰 추가에 따른 임베딩 리사이즈
 
     if adapter_path is not None:
         model = PeftModel.from_pretrained(model, adapter_path)
