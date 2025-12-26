@@ -29,6 +29,7 @@ from api_inference.prompts.templates import (
     get_prompt_template,
     get_system_prompt,
     format_question_message,
+    create_messages,
 )
 
 __all__ = [

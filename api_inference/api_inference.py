@@ -17,14 +17,14 @@ import yaml
 from tqdm.asyncio import tqdm_asyncio
 
 from .utils.api_client import AsyncAPIClient
-from .utils.data_loader import load_test_data, create_messages
+from .utils.data_loader import load_test_data
 from .utils.metrics import (
     get_question_type_stats,
     compute_f1_by_question_type,
     print_evaluation_report,
 )
 from .utils.output_handler import save_results_with_raw, StreamingResultSaver
-from .prompts import QuestionType, format_question_message, SYSTEM_PROMPTS
+from .prompts import QuestionType, format_question_message, create_messages, SYSTEM_PROMPTS
 from common.utils.wandb import set_wandb_env
 from common.utils.logger import setup_logging
 

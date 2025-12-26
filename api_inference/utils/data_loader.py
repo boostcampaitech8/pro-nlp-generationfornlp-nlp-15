@@ -12,23 +12,16 @@ api_inference.prompts 모듈에서 가져오는 것:
 - format_question_message: 프롬프트 포맷터
 - SYSTEM_PROMPTS, PROMPT_TEMPLATES 등
 """
-from typing import List, Dict, Any
+from typing import Any
 
 # ===== common 모듈에서 기본 요소 import =====
-from common.prompts.system import SYSTEM_PROMPT as COMMON_SYSTEM_PROMPT
 from common.data.read_csv import load_qa_examples_from_csv
 
 # ===== api_inference.prompts 모듈에서 import =====
-from api_inference.prompts import (
-    QuestionType,
-    classify_question_type,
-    format_question_message,
-    SYSTEM_PROMPTS,
-    get_system_prompt,
-)
+from api_inference.prompts import classify_question_type
 
 
-def load_test_data(test_path: str) -> List[Dict[str, Any]]:
+def load_test_data(test_path: str) -> list[dict[str, Any]]:
     """
     테스트 데이터 로드 및 파싱 (문제 유형 분류 포함)
     common/data/read_csv.py의 load_qa_examples_from_csv를 활용합니다.
@@ -71,34 +64,3 @@ def load_test_data(test_path: str) -> List[Dict[str, Any]]:
         })
     
     return test_data
-
-
-def create_messages(
-    user_message: str,
-    system_prompt: str = None,
-    question_type: QuestionType = None
-) -> List[Dict[str, str]]:
-    """
-    API 요청용 메시지 리스트 생성
-    
-    Args:
-        user_message: 사용자 메시지 (프롬프트)
-        system_prompt: 시스템 프롬프트 (None이면 유형별 기본값 사용)
-        question_type: 문제 유형 (시스템 프롬프트 자동 선택용)
-    
-    Returns:
-        OpenAI API 형식의 메시지 리스트
-    """
-    # 시스템 프롬프트 결정 로직
-    if system_prompt is None:
-        system_prompt = get_system_prompt(question_type)
-    elif system_prompt == COMMON_SYSTEM_PROMPT and question_type is not None:
-        # 기본 프롬프트가 전달되었지만 유형이 지정된 경우 유형별 프롬프트 사용
-        system_prompt = SYSTEM_PROMPTS.get(question_type, system_prompt)
-    
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_message}
-    ]
-
-

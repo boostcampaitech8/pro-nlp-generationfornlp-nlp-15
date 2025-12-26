@@ -15,9 +15,11 @@ import yaml
 from tqdm.asyncio import tqdm_asyncio
 
 from .utils.api_client import AsyncAPIClient, ANSWER_SELECTION_TOOL
-from .utils.data_loader import (
-    load_test_data, format_question_message, create_messages,
-    QuestionType, SYSTEM_PROMPTS, get_question_type_stats
+from .utils.data_loader import load_test_data
+from .prompts import (
+    QuestionType,
+    format_question_message,
+    create_messages
 )
 from .utils.output_handler import save_results_with_raw
 

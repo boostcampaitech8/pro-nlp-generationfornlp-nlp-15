@@ -291,3 +291,34 @@ def format_question_message(
         question_content=question_content,
         choices=choices_str
     )
+
+
+def create_messages(
+    user_message: str,
+    system_prompt: str = None,
+    question_type: QuestionType = None
+) -> list[dict[str, str]]:
+    """
+    API 요청용 메시지 리스트 생성
+    
+    Args:
+        user_message: 사용자 메시지 (프롬프트)
+        system_prompt: 시스템 프롬프트 (None이면 유형별 기본값 사용)
+        question_type: 문제 유형 (시스템 프롬프트 자동 선택용)
+    
+    Returns:
+        OpenAI API 형식의 메시지 리스트
+    """
+    # 시스템 프롬프트 결정 로직
+    if system_prompt is None:
+        system_prompt = get_system_prompt(question_type)
+    elif system_prompt == COMMON_SYSTEM_PROMPT and question_type is not None:
+        # 기본 프롬프트가 전달되었지만 유형이 지정된 경우 유형별 프롬프트 사용
+        system_prompt = SYSTEM_PROMPTS.get(question_type, system_prompt)
+    
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_message}
+    ]
+
+
