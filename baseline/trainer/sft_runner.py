@@ -79,9 +79,10 @@ class SFTTrainingRunner:
             # 데이터셋의 텍스트 필드 지정 (formatting_func 결과가 저장될 가상의 필드)
             dataset_text_field="text",
             # 가장 좋은 모델 하나만 유지하기 위해 eval_loss를 기준 평가지표로 선정
+            # [변경] F1 Score 최대값 기준으로 모델 저장 (user request)
             load_best_model_at_end=True,
-            metric_for_best_model="eval_loss",
-            greater_is_better=False,
+            metric_for_best_model="eval_macro_f1",
+            greater_is_better=True,
             # save_strategy가 epoch/steps일 때 작동
         )
 
