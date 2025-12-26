@@ -17,6 +17,7 @@ api_inference에서 확장하는 것:
 - classify_question_type: 규칙 기반 문제 유형 분류
 """
 import re
+import pandas as pd
 from typing import List, Dict, Any
 from enum import Enum
 
@@ -395,7 +396,9 @@ def load_test_data(test_path: str) -> List[Dict[str, Any]]:
         }
     """
     qa_examples = load_qa_examples_from_csv(test_path)
-    
+    df = pd.read_csv(test_path)
+    ids = df["id"].astype(str).tolist()
+
     test_data = []
     for idx, example in enumerate(qa_examples):
         question_type = classify_question_type(
@@ -405,7 +408,7 @@ def load_test_data(test_path: str) -> List[Dict[str, Any]]:
         )
         
         test_data.append({
-            'id': example.id if example.id is not None else idx,  
+            'id': ids[idx] if idx < len(ids) else idx,  
             'paragraph': example.paragraph,
             'question': example.question,
             'question_plus': example.question_plus,
