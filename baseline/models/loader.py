@@ -70,7 +70,7 @@ def load_for_train(
             model_name=config.model.name_or_path,
             max_seq_length=config.tokenizer.max_seq_length,
             dtype=_resolve_torch_dtype(config),
-            load_in_4bit=False,  # [비교 실험] Baseline(FP16)과 동일 조건 비교를 위해 4bit 비활성화
+            load_in_4bit=config.model.load_in_4bit,
         )
 
         # Lora
@@ -130,6 +130,23 @@ def load_for_infer(
     """
     Load model + tokenizer for inference.
     """
+    # Unsloth version
+    if config.train.use_unsloth:
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=config.model.name_or_path,
+            max_seq_length=config.tokenizer.max_seq_length,
+            dtype=_resolve_torch_dtype(config),
+            load_in_4bit=config.model.load_in_4bit,
+        )
+        FastLanguageModel.for_inference(model)
+
+        if adapter_path is not None:
+            # Unsloth 모델에 외부 어댑터 로드
+            model = PeftModel.from_pretrained(model, adapter_path)
+
+        return model, tokenizer
+
+    # Normal version
     torch_dtype = _resolve_torch_dtype(config)
 
     tokenizer = _load_tokenizer(

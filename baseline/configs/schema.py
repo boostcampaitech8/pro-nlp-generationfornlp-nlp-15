@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name_or_path: str
+    load_in_4bit: bool = False
 
 
 class TokenizerConfig(BaseModel):
@@ -46,6 +47,7 @@ class TrainConfig(BaseModel):
     gradient_accumulation_steps: int = Field(..., gt=0)
 
     learning_rate: float = Field(..., gt=0.0)
+    warmup_ratio: float = Field(default=0.1, ge=0, le=1.0)
     lr_scheduler_type: Literal["linear", "cosine"]
 
     num_train_epochs: int = Field(..., gt=0)
