@@ -73,6 +73,10 @@ def load_for_train(
             load_in_4bit=config.model.load_in_4bit,
         )
 
+        # Gemma3와 같은 멀티모달 모델은 tokenizer 대신 Gemma3Processor를 반환, 내부 tokenizer 추출 필요
+        if hasattr(tokenizer, "tokenizer"):
+            tokenizer = tokenizer.tokenizer
+
         # Lora
         model = FastLanguageModel.get_peft_model(
             model=model,
