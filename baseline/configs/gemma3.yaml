@@ -43,11 +43,14 @@ infer:
   # adapter_path가 null이면 {train.output_dir}/final_adapter 사용 (코드에서)
   use_adapter: true
   adapter_path: null
+  
+  inference_method: "generate"
+  max_new_tokens: 4096
 
 wandb:
   project: "koreasat_woohyun"
   entity: "hakiful-ai"
-  name: "unsloth/gemma-3-27b-it-bnb-4bit"
+  name: "unsloth/gemma-3-27b-it-bnb-4bit_inference"
   group: "unsloth/gemma-3-27b-it-bnb-4bit"
-  job_type: "train"
-  notes: "full_lora, r: 16, alpha: 32, dropout: 0.05, bzs: 1, accm: 4, lr: 5e-5"
+  job_type: "inference"
+  notes: "generate based output"
