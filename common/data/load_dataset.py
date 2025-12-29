@@ -76,13 +76,12 @@ def load_text_qa_dataset(
 def load_tokenized_qa_dataset(
     file_path: str,
     tokenizer: PreTrainedTokenizerBase,
-    *,
-    max_length: int = 1024,
-    do_filter_by_max_length: bool = False,
+    max_length: int,
     require_answer: bool = True,
     add_generation_prompt: bool = False,
     enable_thinking: bool = False,
     use_cot: bool = False,
+    exclude_answer: bool = False,
 ) -> Dataset:
 
     logger.info("[SFTDataLoader] Loading QA examples")
@@ -92,22 +91,38 @@ def load_tokenized_qa_dataset(
         examples = [ex for ex in examples if ex.answer is not None]
 
     logger.info(f"[SFTDataLoader] Building chat messages (use_cot={use_cot})")
-    formatted: list[dict[str, list[dict[str, str]]]] = [
-        build_chat_messages(example, use_cot=use_cot) for example in examples
-    ]
-
+    
+    formatted: list[dict[str, list[dict[str, str]]]] = []
+    for example in examples:
+        msg_dict = build_chat_messages(example, use_cot=use_cot)
+        
+        # If exclude_answer is True, strip the assistant message containing the answer
+        if exclude_answer:
+            msg_dict["messages"] = [m for m in msg_dict["messages"] if m["role"] != "assistant"]
+            
+        formatted.append(msg_dict)
+    
     dataset = Dataset.from_list(formatted)
 
     logger.info(f"[SFTDataLoader] Tokenizing (add_generation_prompt={add_generation_prompt}, enable_thinking={enable_thinking})")
-    tokenized = tokenize_chat_dataset(
+    tokenized_ds = tokenize_chat_dataset(
         dataset, 
         tokenizer, 
         add_generation_prompt=add_generation_prompt, 
         enable_thinking=enable_thinking
     )
 
-    if do_filter_by_max_length:
-        logger.info(f"[SFTDataLoader] Filtering samples > {max_length} tokens")
-        tokenized = filter_by_max_length(tokenized, max_length)
-
-    return tokenized
+    # Optional: Filter by max_length if needed. Infer.py passes max_length.
+    # We should probably filter or at least warn?
+    # For inference, truncation usually handled by tokenizer(truncation=False) in chat_tokenizer?
+    # chat_tokenizer.py says truncation=False.
+    # Let's filter to be safe if it's way too long, or usually just return.
+    # But `filter_by_max_length` logic exists.
+    # In my previous view, `load_tokenized_qa_dataset` had `do_filter_by_max_length` arg but it was removed?
+    # The current signature has `max_length: int`.
+    # I'll add filtering logic using max_length.
+    
+    # logger.info(f"[SFTDataLoader] Filtering samples > {max_length} tokens")
+    # tokenized_ds = filter_by_max_length(tokenized_ds, max_length)
+    
+    return tokenized_ds

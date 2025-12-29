@@ -35,7 +35,7 @@ def main():
     examples = load_qa_examples_from_csv(data_path)
     
     # 4. Sample 5 random examples
-    samples = random.sample(examples, 5)
+    samples = random.sample(examples, 10)
     
     print("\n" + "="*50)
     print(" Starting Logit Inspection Test (Next Token Prediction) ")

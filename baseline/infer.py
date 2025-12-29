@@ -84,6 +84,7 @@ def main() -> None:
         add_generation_prompt=is_generate_mode,  # Pass generation prompt flag
         enable_thinking=is_generate_mode, # Enable thinking if generation mode
         use_cot=is_generate_mode, # Use CoT system prompt if generation mode (for Gemma 3 etc)
+        exclude_answer=True, # CRITICAL: Always correct for valid/test sets to prevent feeding answer
     )
     test_df = pd.read_csv(config.infer.test_path)
     ids = test_df["id"].astype(str).tolist()
