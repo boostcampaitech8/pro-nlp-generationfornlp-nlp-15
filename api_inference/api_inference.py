@@ -218,7 +218,10 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
     
     # 비동기 API 클라이언트 초기화
     client = AsyncAPIClient(config)
-    
+    # 동시 요청 수 설정
+    max_concurrent = config['inference'].get('max_concurrent', 40)
+    semaphore = asyncio.Semaphore(max_concurrent)
+
     # 데이터 로드 (train 모드면 train_path, test 모드면 test_path)
     if is_train_mode:
         data_path = config['data'].get('train_path', 'data/train.csv')
@@ -227,13 +230,24 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
         data_path = config['data']['test_path']
         print(f"[Test Mode] Loading data from: {data_path}")
     
-    test_data = load_test_data(data_path)
-    
-    # 샘플 수 제한: CLI 옵션 > yaml 설정
+    # 시스템 프롬프트 (유형별 프롬프트 미사용 시에만 적용)
+    system_prompt = config['inference'].get('system_prompt')
+    if not system_prompt:
+        from .prompts import SYSTEM_PROMPTS
+        system_prompt = SYSTEM_PROMPTS.get(None)
+
+    # 샘플 수 제한: CLI 옵션 > yaml 설정 (LLM 분류 전에 적용!)
     effective_sample_size = sample_size or config['data'].get('sample_size')
     if effective_sample_size is not None and effective_sample_size > 0:
-        test_data = test_data[:effective_sample_size]
-        print(f"[Sample Mode] Using {len(test_data)} samples (limited to {effective_sample_size})")
+        print(f"[Sample Mode] Will use {effective_sample_size} samples")
+
+    test_data = await load_test_data(
+        data_path,
+        llm_client=client,
+        system_prompt=system_prompt,
+        semaphore=semaphore,
+        sample_size=effective_sample_size,  # yaml 설정도 반영된 값 전달
+    )
     
     # 문제 유형별 통계 출력
     type_stats = get_question_type_stats(test_data)
@@ -252,10 +266,6 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
     
     # CoT (Chain of Thought) 프롬프트 사용 여부
     use_cot = config['inference'].get('use_cot', False)
-    
-    # 동시 요청 수 설정
-    max_concurrent = config['inference'].get('max_concurrent', 40)
-    semaphore = asyncio.Semaphore(max_concurrent)
     
     # 배치 저장 크기 (기본값: 50)
     save_batch_size = config['inference'].get('save_batch_size', 50)

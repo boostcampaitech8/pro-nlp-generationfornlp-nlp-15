@@ -1,5 +1,5 @@
-# API Inference Configuration
-# OpenAPI 호환 서버용 추론 설정 파일
+# API Inference Configuration - No CoT
+# OpenAPI 호환 서버용 추론 설정 파일 (CoT 미사용)
 
 # 실행 모드 ("train" 또는 "test")
 # - train: train.csv 사용, F1 Score 계산, wandb 기록
@@ -16,7 +16,7 @@ api:
 data:
   train_path: "data/balanced_train.csv"           # 학습 데이터 경로
   test_path: "data/test.csv"             # 테스트 데이터 경로
-  output_dir: "data"                     # 출력 디렉토리
+  output_dir: "data/no_cot"              # 출력 디렉토리 (CoT 미사용 결과)
   sample_size: null                      # 샘플 수 제한 (null이면 전체, 숫자면 해당 개수만 사용)
 
 inference:
@@ -27,12 +27,12 @@ inference:
   max_concurrent: 5                     # 동시 요청 수 (병렬 처리)
   tool_choice: "auto"                    # Function call 선택 방식 (vLLM Hermes: "auto" 권장)
   use_type_specific_prompt: true         # 문제 유형별 프롬프트 사용 여부 (true: 유형별, false: 기본)
-  use_cot: true                          # CoT(Chain of Thought) 프롬프트 사용 여부 (true: 추론 과정 서술 후 "정답: 숫자" 출력)
+  use_cot: false                         # CoT 미사용
   use_streaming_save: false               # 실시간 저장 모드 (true: 배치마다 저장, false: 완료 후 한번에 저장)
   save_batch_size: 20                    # 배치 저장 크기 (use_streaming_save=true일 때 적용)
 
 wandb:
   project: "koreasat_jisoo_prompt"
   entity: "hakiful-ai"
-  name: "problem-classification-with-llm-cot"
-  # "exaone-32b/exaone-32b-problem-classification-train"
+  name: "problem-classification-with-llm-no-cot"
+

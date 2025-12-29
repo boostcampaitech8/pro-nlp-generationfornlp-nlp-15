@@ -14,6 +14,7 @@ import argparse
 import yaml
 from tqdm.asyncio import tqdm_asyncio
 
+from .utils.metrics import get_question_type_stats
 from .utils.api_client import AsyncAPIClient, ANSWER_SELECTION_TOOL
 from .utils.data_loader import load_test_data
 from .prompts import (

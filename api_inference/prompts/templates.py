@@ -8,7 +8,7 @@
 """
 from typing import Any
 
-from api_inference.prompts.question_type import QuestionType, classify_question_type
+from api_inference.prompts.question_type import QuestionType, classify_question_type_with_llm
 from common.prompts.system import SYSTEM_PROMPT as COMMON_SYSTEM_PROMPT
 
 
@@ -105,6 +105,71 @@ COT_FILL_BLANK_PROMPT_FORMAT = """지문:
 추론 과정을 먼저 서술한 후, 반드시 마지막 줄에 "정답: 숫자" 형식으로 답을 출력하세요.
 """
 
+COT_FACTUAL_RETRIEVAL_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 지문에서 구체적인 정보(무엇, 누구, 언제, 어디 등)를 확인하는 유형입니다.
+지문에서 해당 정보를 찾아 정답을 도출하세요.
+추론 과정을 먼저 서술한 후, 반드시 마지막 줄에 "정답: 숫자" 형식으로 답을 출력하세요.
+"""
+
+COT_REASONING_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 인과관계, 이유, 근거를 묻는 유형입니다.
+지문에서 원인과 결과, 근거를 논리적으로 분석하여 정답을 도출하세요.
+추론 과정을 먼저 서술한 후, 반드시 마지막 줄에 "정답: 숫자" 형식으로 답을 출력하세요.
+"""
+
+COT_CALCULATION_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 수치, 금액, 계산, 점유율 등을 묻는 계산형 문제입니다.
+지문과 선택지의 수치를 비교·계산하여 정답을 도출하세요.
+추론 과정을 먼저 서술한 후, 반드시 마지막 줄에 "정답: 숫자" 형식으로 답을 출력하세요.
+"""
+
+COT_SENTENCE_COMPLETION_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 문장을 완성하는 유형입니다.
+지문과 문맥을 고려하여 가장 자연스럽게 문장이 완성되는 선택지를 고르세요.
+추론 과정을 먼저 서술한 후, 반드시 마지막 줄에 "정답: 숫자" 형식으로 답을 출력하세요.
+"""
+
+COT_TOPIC_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 글의 주제나 제목을 묻는 유형입니다.
+지문의 전체 내용을 파악하여 가장 적절한 주제/제목을 선택하세요.
+추론 과정을 먼저 서술한 후, 반드시 마지막 줄에 "정답: 숫자" 형식으로 답을 출력하세요.
+"""
+
 # CoT 유형별 프롬프트 매핑
 COT_PROMPT_TEMPLATES = {
     QuestionType.MULTI_LABEL: COT_MULTI_LABEL_PROMPT_FORMAT,
@@ -112,6 +177,11 @@ COT_PROMPT_TEMPLATES = {
     QuestionType.SEQUENCE: COT_SEQUENCE_PROMPT_FORMAT,
     QuestionType.FILL_BLANK: COT_FILL_BLANK_PROMPT_FORMAT,
     QuestionType.DEFAULT: COT_PROMPT_FORMAT,
+    QuestionType.FACTUAL_RETRIEVAL: COT_FACTUAL_RETRIEVAL_PROMPT_FORMAT,
+    QuestionType.REASONING: COT_REASONING_PROMPT_FORMAT,
+    QuestionType.CALCULATION: COT_CALCULATION_PROMPT_FORMAT,
+    QuestionType.SENTENCE_COMPLETION: COT_SENTENCE_COMPLETION_PROMPT_FORMAT,
+    QuestionType.TOPIC: COT_TOPIC_PROMPT_FORMAT,
 }
 
 
@@ -189,6 +259,71 @@ FILL_BLANK_PROMPT_FORMAT = """지문:
 정답 숫자 하나만 출력하세요.
 """
 
+FACTUAL_RETRIEVAL_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 지문에서 구체적인 정보(무엇, 누구, 언제, 어디 등)를 확인하는 유형입니다.
+지문에서 해당 정보를 찾아 정답을 도출하세요.
+정답 숫자 하나만 출력하세요.
+"""
+
+REASONING_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 인과관계, 이유, 근거를 묻는 유형입니다.
+지문에서 원인과 결과, 근거를 논리적으로 분석하여 정답을 도출하세요.
+정답 숫자 하나만 출력하세요.
+"""
+
+CALCULATION_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 수치, 금액, 계산, 점유율 등을 묻는 계산형 문제입니다.
+지문과 선택지의 수치를 비교·계산하여 정답을 도출하세요.
+정답 숫자 하나만 출력하세요.
+"""
+
+SENTENCE_COMPLETION_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 글의 주제나 제목을 묻는 유형입니다.
+지문의 전체 내용을 파악하여 가장 적절한 주제/제목을 선택하세요.
+정답 숫자 하나만 출력하세요.
+"""
+
+TOPIC_PROMPT_FORMAT = """지문:
+{paragraph}
+
+{question_content}
+
+선택지:
+{choices}
+
+이 문제는 문장을 완성하는 유형입니다.
+지문과 문맥을 고려하여 가장 자연스럽게 문장이 완성되는 선택지를 고르세요.
+정답 숫자 하나만 출력하세요.
+"""
+
 # 유형별 프롬프트 매핑
 PROMPT_TEMPLATES = {
     QuestionType.MULTI_LABEL: MULTI_LABEL_PROMPT_FORMAT,
@@ -196,6 +331,11 @@ PROMPT_TEMPLATES = {
     QuestionType.SEQUENCE: SEQUENCE_PROMPT_FORMAT,
     QuestionType.FILL_BLANK: FILL_BLANK_PROMPT_FORMAT,
     QuestionType.DEFAULT: BASE_PROMPT_FORMAT,
+    QuestionType.FACTUAL_RETRIEVAL: FACTUAL_RETRIEVAL_PROMPT_FORMAT,
+    QuestionType.REASONING: REASONING_PROMPT_FORMAT,
+    QuestionType.CALCULATION: CALCULATION_PROMPT_FORMAT,
+    QuestionType.SENTENCE_COMPLETION: SENTENCE_COMPLETION_PROMPT_FORMAT,
+    QuestionType.TOPIC: TOPIC_PROMPT_FORMAT,
 }
 
 
@@ -208,6 +348,11 @@ SYSTEM_PROMPTS = {
     QuestionType.SINGLE_CORRECT: "지문을 읽고 옳은 것 또는 옳지 않은 것을 정확히 고르세요.",
     QuestionType.SEQUENCE: "지문을 읽고 시간 순서를 정확히 파악하여 답하세요.",
     QuestionType.FILL_BLANK: "지문을 읽고 빈칸에 들어갈 알맞은 내용을 고르세요.",
+    QuestionType.FACTUAL_RETRIEVAL: "지문에서 구체적인 정보를 찾아 정확히 답하세요.",
+    QuestionType.REASONING: "지문에서 원인, 근거, 이유를 논리적으로 분석하여 답하세요.",
+    QuestionType.CALCULATION: "지문과 선택지의 수치를 비교·계산하여 답하세요.",
+    QuestionType.SENTENCE_COMPLETION: "문맥상 가장 자연스럽게 문장이 완성되는 선택지를 고르세요.",
+    QuestionType.TOPIC: "글의 주제나 제목을 파악하여 가장 적절한 선택지를 고르세요.",
     QuestionType.DEFAULT: COMMON_SYSTEM_PROMPT,
 }
 
@@ -272,7 +417,7 @@ def format_question_message(
     """
     # 문제 유형이 지정되지 않으면 자동 분류
     if question_type is None:
-        question_type = classify_question_type(question, question_plus, choices_list)
+        question_type = classify_question_type_with_llm(question, question_plus, choices_list)
     
     # 선택지 문자열 생성
     choices_str = "\n".join([f"{i + 1} - {choice}" for i, choice in enumerate(choices_list)])
@@ -320,5 +465,3 @@ def create_messages(
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_message}
     ]
-
-
