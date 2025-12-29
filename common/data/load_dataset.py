@@ -80,6 +80,7 @@ def load_tokenized_qa_dataset(
     max_length: int = 1024,
     do_filter_by_max_length: bool = False,
     require_answer: bool = True,
+    add_generation_prompt: bool = False,
 ) -> Dataset:
 
     logger.info("[SFTDataLoader] Loading QA examples")
@@ -95,8 +96,10 @@ def load_tokenized_qa_dataset(
 
     dataset = Dataset.from_list(formatted)
 
-    logger.info("[SFTDataLoader] Tokenizing")
-    tokenized = tokenize_chat_dataset(dataset, tokenizer)
+    logger.info(f"[SFTDataLoader] Tokenizing (add_generation_prompt={add_generation_prompt})")
+    tokenized = tokenize_chat_dataset(
+        dataset, tokenizer, add_generation_prompt=add_generation_prompt
+    )
 
     if do_filter_by_max_length:
         logger.info(f"[SFTDataLoader] Filtering samples > {max_length} tokens")

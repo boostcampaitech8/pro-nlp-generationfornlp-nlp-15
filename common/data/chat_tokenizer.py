@@ -5,13 +5,18 @@ from transformers import PreTrainedTokenizerBase
 def tokenize_chat_dataset(
     dataset: Dataset,
     tokenizer: PreTrainedTokenizerBase,
+    add_generation_prompt: bool = False,
 ) -> Dataset:
     """
     Apply chat template and tokenize messages.
     """
     def tokenize_fn(examples: dict[str, list]) -> dict[str, list]:
         texts: list[str] = [
-            tokenizer.apply_chat_template(msg, tokenize=False)
+            tokenizer.apply_chat_template(
+                msg,
+                tokenize=False,
+                add_generation_prompt=add_generation_prompt
+            )
             for msg in examples["messages"]
         ]
 

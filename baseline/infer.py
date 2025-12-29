@@ -73,33 +73,77 @@ def main() -> None:
     device = next(model.parameters()).device
 
     # 5) tokenized dataset + ids
+    # Generation Mode requires adding the generation prompt
+    is_generate_mode = getattr(config.infer, "inference_method", "logits") == "generate"
+    
     ds = load_tokenized_qa_dataset(
         file_path=str(config.infer.test_path),
         tokenizer=tokenizer,
         max_length=config.tokenizer.max_seq_length,
         require_answer=False,
+        add_generation_prompt=is_generate_mode,  # Pass generation prompt flag
     )
     test_df = pd.read_csv(config.infer.test_path)
     ids = test_df["id"].astype(str).tolist()
 
-    # 6) inference (next-token logits over "1"~"5")
-    choice_ids = tokenizer.convert_tokens_to_ids(["1", "2", "3", "4", "5"])
-
     results: list[dict[str, str]] = []
-    with torch.inference_mode():
-        for i, item in tqdm(
-            enumerate(ds), total=len(ds), desc="Inference", mininterval=0.5
-        ):
-            input_ids = torch.tensor(
-                item["input_ids"], dtype=torch.long, device=device
-            ).unsqueeze(0)
+    
+    # 6-A) Generation Mode
+    if is_generate_mode:
+        log.info(f"Running Inference in GENERATION mode (Thinking enabled if model supports it)")
+        import re
+        
+        # Regex to find answer: Look for '정답', '답', 'Answer' followed by a number 1-5
+        # We look for the last occurrence as the final conclusion
+        answer_pattern = re.compile(r'(?:정답|답|Answer)\s*:?\s*.*?([1-5])')
 
-            logits = model(input_ids=input_ids).logits[0, -1, :].float()
-            target_logits = logits[choice_ids]
-            probs = torch.softmax(target_logits, dim=-1).detach().cpu().numpy()
-            pred = str(int(np.argmax(probs)) + 1)
-
+        for i, item in tqdm(enumerate(ds), total=len(ds), desc="Gen-Inference"):
+            input_ids = torch.tensor(item["input_ids"], dtype=torch.long, device=device).unsqueeze(0)
+            
+            # Generate
+            with torch.inference_mode():
+                generated_ids = model.generate(
+                    input_ids=input_ids,
+                    max_new_tokens=getattr(config.infer, "max_new_tokens", 4096),
+                    do_sample=True, # Thinking usually works best with sampling
+                    temperature=0.7,
+                )
+            
+            # Decode only new tokens
+            new_tokens = generated_ids[0][len(input_ids[0]):]
+            response = tokenizer.decode(new_tokens, skip_special_tokens=True)
+            
+            # Parse Answer
+            matches = answer_pattern.findall(response)
+            if matches:
+                pred = matches[-1] # Take the last one found
+            else:
+                # Fallback: try to find just any single digit 1-5 at the very end of text
+                # or just default to 1 if totally failed (rare if model follows instruction)
+                simple_digit = re.findall(r'([1-5])', response)
+                pred = simple_digit[-1] if simple_digit else "1"
+            
             results.append({"id": ids[i], "answer": pred})
+
+    # 6-B) Logits Mode (Original)
+    else:
+        log.info("Running Inference in LOGITS mode (Next Token Prediction)")
+        choice_ids = tokenizer.convert_tokens_to_ids(["1", "2", "3", "4", "5"])
+        
+        with torch.inference_mode():
+            for i, item in tqdm(
+                enumerate(ds), total=len(ds), desc="Inference", mininterval=0.5
+            ):
+                input_ids = torch.tensor(
+                    item["input_ids"], dtype=torch.long, device=device
+                ).unsqueeze(0)
+
+                logits = model(input_ids=input_ids).logits[0, -1, :].float()
+                target_logits = logits[choice_ids]
+                probs = torch.softmax(target_logits, dim=-1).detach().cpu().numpy()
+                pred = str(int(np.argmax(probs)) + 1)
+
+                results.append({"id": ids[i], "answer": pred})
 
     # 7) save
     out_path = Path(config.infer.output_path)

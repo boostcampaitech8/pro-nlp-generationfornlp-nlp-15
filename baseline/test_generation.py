@@ -54,7 +54,7 @@ def main():
                 messages,
                 tokenize=False,
                 add_generation_prompt=True,
-                enable_thinking=True 
+                enable_thinking=False, 
             )
         except TypeError:
             # Fallback if argument not accepted
@@ -65,7 +65,7 @@ def main():
                 add_generation_prompt=True
             )
             
-        print(f"[Input Prompt Preview]:\n{text[:500]}...\n(truncated)\n")
+        print(f"[Input Prompt]:\n{text}\n\n")
 
         model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
 

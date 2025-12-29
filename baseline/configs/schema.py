@@ -84,6 +84,9 @@ class InferConfig(BaseModel):
     fallback_generate: bool = True
     max_new_tokens: int = Field(8, gt=0)
 
+    # 추론 방식 선택
+    inference_method: Literal["logits", "generate"] = "logits"
+
 
 class WandBConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")

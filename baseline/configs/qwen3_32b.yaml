@@ -44,6 +44,9 @@ infer:
   use_adapter: false
   adapter_path: null
 
+  inference_method: "generate"
+  max_new_tokens: 4096
+
 wandb:
   project: "koreasat_woohyun"
   entity: "hakiful-ai"
