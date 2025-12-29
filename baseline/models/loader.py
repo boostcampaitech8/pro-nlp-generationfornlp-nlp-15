@@ -73,7 +73,7 @@ def load_for_train(
             load_in_4bit=config.model.load_in_4bit,
         )
 
-        # Gemma3와 같은 멀티모달 모델은 tokenizer 대신 Gemma3Processor를 반환, 내부 tokenizer 추출 필요
+        # Gemma3와 같은 멀티모달 모델은 tokenizer 대신 Gemma3Processor를 반환, Gemma3Processor 내부 tokenizer 필요
         if hasattr(tokenizer, "tokenizer"):
             tokenizer = tokenizer.tokenizer
 
@@ -142,6 +142,11 @@ def load_for_infer(
             dtype=_resolve_torch_dtype(config),
             load_in_4bit=config.model.load_in_4bit,
         )
+
+        # Gemma3와 같은 멀티모달 모델은 tokenizer 대신 Gemma3Processor를 반환, Gemma3Processor 내부 tokenizer 필요
+        if hasattr(tokenizer, "tokenizer"):
+            tokenizer = tokenizer.tokenizer
+
         FastLanguageModel.for_inference(model)
 
         if adapter_path is not None:
