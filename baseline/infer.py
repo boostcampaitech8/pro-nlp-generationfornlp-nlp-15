@@ -82,6 +82,7 @@ def main() -> None:
         max_length=config.tokenizer.max_seq_length,
         require_answer=False,
         add_generation_prompt=is_generate_mode,  # Pass generation prompt flag
+        enable_thinking=is_generate_mode, # Enable thinking if generation mode
     )
     test_df = pd.read_csv(config.infer.test_path)
     ids = test_df["id"].astype(str).tolist()
