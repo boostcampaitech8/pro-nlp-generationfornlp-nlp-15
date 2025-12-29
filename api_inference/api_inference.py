@@ -241,12 +241,18 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
     if effective_sample_size is not None and effective_sample_size > 0:
         print(f"[Sample Mode] Will use {effective_sample_size} samples")
 
+    # 문제 유형 분류 투표 횟수 (다수결 방식)
+    classification_votes = config['inference'].get('classification_votes', 1)
+    if classification_votes > 1:
+        print(f"[Classification] Using majority vote with {classification_votes} votes")
+
     test_data = await load_test_data(
         data_path,
         llm_client=client,
         system_prompt=system_prompt,
         semaphore=semaphore,
         sample_size=effective_sample_size,  # yaml 설정도 반영된 값 전달
+        classification_votes=classification_votes,
     )
     
     # 문제 유형별 통계 출력

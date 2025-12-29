@@ -29,16 +29,27 @@ async def load_test_data(
     system_prompt,
     semaphore,
     sample_size: int = None,
+    classification_votes: int = 1,
 ) -> list[dict[str, Any]]:
     """
     테스트 데이터 로드 및 파싱 (LLM 기반 문제 유형 분류, 비동기)
     sample_size 적용, csv 저장 옵션 분리
+    
+    Args:
+        test_path: 테스트 데이터 CSV 경로
+        llm_client: 비동기 API 클라이언트
+        system_prompt: 시스템 프롬프트
+        semaphore: 동시 요청 제한용 세마포어
+        sample_size: 샘플 수 제한 (None이면 전체)
+        classification_votes: 문제 유형 분류 투표 횟수 (기본값: 1, 다수결 투표 시 3 이상 권장)
     """
     qa_examples = load_qa_examples_from_csv(test_path)
     if sample_size is not None and sample_size > 0:
         qa_examples = qa_examples[:sample_size]
+    
+    vote_desc = f"LLM 분류 진행 (votes={classification_votes})"
     test_data = []
-    for example in tqdm(qa_examples, desc="LLM 분류 진행"):
+    for example in tqdm(qa_examples, desc=vote_desc):
         question_type = await classify_question_type_with_llm(
             llm_client,
             example.question,
@@ -46,6 +57,7 @@ async def load_test_data(
             example.choices,
             system_prompt,
             semaphore,
+            num_votes=classification_votes,
         )
         test_data.append({
             "id": example.id,
