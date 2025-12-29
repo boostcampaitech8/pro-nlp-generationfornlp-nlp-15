@@ -41,7 +41,7 @@ infer:
   output_path: "output.csv"
 
   # adapter_path가 null이면 {train.output_dir}/final_adapter 사용 (코드에서)
-  use_adapter: true
+  use_adapter: false
   adapter_path: null
   
   inference_method: "generate"

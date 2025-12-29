@@ -44,7 +44,7 @@ infer:
   use_adapter: false
   adapter_path: null
 
-  inference_method: "generate"
+  inference_method: "logits"
   max_new_tokens: 4096
 
 wandb:
