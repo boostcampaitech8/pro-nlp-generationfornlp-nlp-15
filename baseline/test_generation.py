@@ -17,7 +17,7 @@ from transformers import TextStreamer
 
 def main():
     # 1. Configuration
-    config_path = "baseline/configs/qwen3_32b.yaml"
+    config_path = "baseline/configs/gemma3.yaml"
     print(f"Loading config from {config_path}...")
     config = load_config(config_path)
 
@@ -45,7 +45,8 @@ def main():
         print(f"--- Sample {i+1} ---")
         
         # Build messages
-        messages_dict = build_chat_messages(example)
+        # Use CoT prompt for Gemma 3 to enforce reasoning first
+        messages_dict = build_chat_messages(example, use_cot=True)
         messages = messages_dict["messages"]
         
         # Apply chat template

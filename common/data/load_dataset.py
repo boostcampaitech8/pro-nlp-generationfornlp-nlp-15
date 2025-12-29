@@ -82,6 +82,7 @@ def load_tokenized_qa_dataset(
     require_answer: bool = True,
     add_generation_prompt: bool = False,
     enable_thinking: bool = False,
+    use_cot: bool = False,
 ) -> Dataset:
 
     logger.info("[SFTDataLoader] Loading QA examples")
@@ -90,9 +91,9 @@ def load_tokenized_qa_dataset(
     if require_answer:
         examples = [ex for ex in examples if ex.answer is not None]
 
-    logger.info("[SFTDataLoader] Building chat messages")
+    logger.info(f"[SFTDataLoader] Building chat messages (use_cot={use_cot})")
     formatted: list[dict[str, list[dict[str, str]]]] = [
-        build_chat_messages(example) for example in examples
+        build_chat_messages(example, use_cot=use_cot) for example in examples
     ]
 
     dataset = Dataset.from_list(formatted)
