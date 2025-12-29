@@ -71,7 +71,6 @@ class SFTTrainingRunner:
             save_total_limit=train.save_total_limit,
             fp16=train.fp16,
             bf16=train.bf16,
-            tf32=train.tf32,
             gradient_checkpointing=train.gradient_checkpointing,
             max_length=tokenizer.max_seq_length,
             dataset_kwargs={"skip_prepare_dataset": True},
@@ -113,6 +112,7 @@ class SFTTrainingRunner:
             callbacks=callbacks,
             args=args,
         )
+        
         return self._trainer
 
     def train(self) -> None:
@@ -176,19 +176,19 @@ class SFTTrainingRunner:
             gold = self.metrics.logit_token_ids.index(gold_token_id)
 
             # 5️⃣ prompt 디코딩 (answer 직전까지만)
-            prompt = self.tokenizer.decode(
-                input_ids[i][:p],
-                skip_special_tokens=False,
-            )
+            # prompt = self.tokenizer.decode(
+            #     input_ids[i][:p],
+            #     skip_special_tokens=False,
+            # )
 
             # 6️⃣ row 구성
             rows.append([
                 sample_ids[i],
-                gold,
-                pred,
+                gold+1, # 1-based index로 변환
+                pred+1, # 1-based index로 변환
                 gold == pred,
                 *[round(float(p), 6) for p in probs],  # p1~p5
-                prompt,
+                # prompt,
             ])
 
         # 7️⃣ CSV 저장
@@ -205,7 +205,7 @@ class SFTTrainingRunner:
                 "prob_3",
                 "prob_4",
                 "prob_5",
-                "prompt",
+                # "prompt",
             ])
             writer.writerows(rows)
 

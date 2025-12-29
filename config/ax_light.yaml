@@ -2,8 +2,9 @@
 # 1-depth 섹션만 사용 (nested 최소)
 
 model:
-  # name_or_path: "beomi/gemma-ko-2b"
   name_or_path: "skt/A.X-4.0-Light"
+  use_unsloth: false
+  load_in_4bit: false
 
 tokenizer:
   max_seq_length: 10000
@@ -12,7 +13,10 @@ tokenizer:
 train:
   train_path: "/data/ephemeral/home/ksat_data/train.csv"
   valid_path: "/data/ephemeral/home/ksat_data/valid.csv"
-  output_dir: "./outputs_skt"
+  output_dir: "./outputs_ax_light"
+
+  load_adapter: false
+  adapter_path: outputs/stage1_lora   # 또는 null
 
   # LoRA (train only)
   lora_r: 16
@@ -26,9 +30,9 @@ train:
   gradient_accumulation_steps: 4
   learning_rate: 5e-5
   lr_scheduler_type: "linear"
-  num_train_epochs: 3
+  num_train_epochs: 5
 
-  bf16: true
+  fp16: true
   gradient_checkpointing: false
   seed: 42
   weight_decay: 0.01

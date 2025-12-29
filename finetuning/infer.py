@@ -58,23 +58,35 @@ def main() -> None:
         include_answer=False,
         max_length=config.tokenizer.max_seq_length
     )
-    test_df = pd.read_csv(config.infer.test_path)
-    ids = test_df["id"].astype(str).tolist()
-
+    
     # 6) inference (next-token logits over "1"~"5")
-    choice_ids = tokenizer.convert_tokens_to_ids(["1", "2", "3", "4", "5"])
+    choice_tokens = ["1", "2", "3", "4", "5"]
+    choice_ids = tokenizer.convert_tokens_to_ids(choice_tokens)
 
-    results: list[dict[str, str]] = []
+    results: list[dict[str, object]] = []
     with torch.inference_mode():
         for i, item in tqdm(enumerate(ds), total=len(ds), desc="Inference", mininterval=0.5):
             input_ids = torch.tensor(item["input_ids"], dtype=torch.long, device=device).unsqueeze(0)
 
             logits = model(input_ids=input_ids).logits[0, -1, :].float()
             target_logits = logits[choice_ids]
-            probs = torch.softmax(target_logits, dim=-1).detach().cpu().numpy()
-            pred = str(int(np.argmax(probs)) + 1)
+            probs = torch.softmax(target_logits, dim=-1).detach().cpu().numpy()  # shape (5,)
 
-            results.append({"id": ids[i], "answer": pred})
+            pred_idx = int(np.argmax(probs))          # 0~4
+            pred = str(pred_idx + 1)                  # "1"~"5"
+            top_prob = float(probs[pred_idx])
+
+            row = {
+                "id": item["sample_id"],
+                "pred": pred,
+                "top_prob": top_prob,
+                "prob_1": float(probs[0]),
+                "prob_2": float(probs[1]),
+                "prob_3": float(probs[2]),
+                "prob_4": float(probs[3]),
+                "prob_5": float(probs[4]),
+            }
+            results.append(row)
 
     # 7) save
     out_path = Path(config.infer.output_path)

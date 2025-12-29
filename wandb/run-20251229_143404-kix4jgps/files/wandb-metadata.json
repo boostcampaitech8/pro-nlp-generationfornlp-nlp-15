@@ -1,0 +1,19 @@
+{
+  "os":  "Linux-5.4.0-99-generic-x86_64-with-glibc2.31",
+  "python":  "CPython 3.12.12",
+  "startedAt":  "2025-12-29T14:34:04.942080Z",
+  "args":  [
+    "--config",
+    "./config/gemma_27b_4bit.yaml"
+  ],
+  "program":  "-m finetuning.train",
+  "git":  {
+    "remote":  "git@github.com:boostcampaitech8/pro-nlp-generationfornlp-nlp-15.git",
+    "commit":  "82fee2a4b863238716dab47add4faa4c473f8fd5"
+  },
+  "email":  "shinedngus225@gmail.com",
+  "root":  "/data/ephemeral/home/yejoon/pro-nlp-generationfornlp-nlp-15",
+  "host":  "instance-17921",
+  "executable":  "/data/ephemeral/home/yejoon/pro-nlp-generationfornlp-nlp-15/.venv/bin/python3",
+  "writerId":  "aee37wep0l97j61zp97sxhmbub8uhjaq"
+}

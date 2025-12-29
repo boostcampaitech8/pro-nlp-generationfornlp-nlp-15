@@ -2,8 +2,6 @@ import argparse
 import logging
 from pathlib import Path
 
-
-
 from .configs.load import load_config
 from .models.loader import load_for_train
 from .trainer.metrics import CustomMetrics
@@ -42,7 +40,11 @@ def main() -> None:
 
     # 4) model + tokenizer (+ LoRA)
     log.info("Loading model/tokenizer...")
-    model, tokenizer, peft_config = load_for_train(config)
+    adapter_path = None
+    if config.train.load_adapter:
+        adapter_path = config.train.adapter_path
+        
+    model, tokenizer, peft_config = load_for_train(config, adapter_path=adapter_path)
 
     # 5) dataset (single CSV -> train/val split)
     log.info("Building datasets...")

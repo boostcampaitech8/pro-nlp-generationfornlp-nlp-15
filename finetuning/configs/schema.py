@@ -9,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field
 class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name_or_path: str
+    use_unsloth: bool
+    load_in_4bit: bool
 
 
 class TokenizerConfig(BaseModel):
@@ -31,6 +33,9 @@ class TrainConfig(BaseModel):
     train_path: Path
     valid_path: Path
     output_dir: Path
+    
+    load_adapter: bool
+    adapter_path: Path
 
     # LoRA (train only) - 1-depth 유지: nested 없이 train 내부에 flat로 둠
     lora_r: int = Field(..., gt=0)
@@ -52,13 +57,12 @@ class TrainConfig(BaseModel):
 
     fp16: bool = False
     bf16: bool = False
-    tf32: bool = False
     gradient_checkpointing: bool = False
 
     logging_steps: int = Field(1, ge=1)
     evaluation_strategy: Literal["no", "steps", "epoch"] = "epoch"
     save_strategy: Literal["no", "steps", "epoch"] = "epoch"
-    save_total_limit: int = Field(2, ge=0)
+    save_total_limit: int = Field(3, ge=0)
 
     seed: int = 42
     weight_decay: float = Field(0.0, ge=0.0)

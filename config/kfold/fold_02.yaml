@@ -1,0 +1,35 @@
+model:
+  name_or_path: skt/A.X-4.0-Light
+tokenizer:
+  max_seq_length: 10000
+  padding_side: right
+train:
+  train_path: /data/ephemeral/home/ksat_data/kfold/fold_02_train.csv
+  valid_path: /data/ephemeral/home/ksat_data/kfold/fold_02_valid.csv
+  output_dir: outputs_ax_light/fold_02
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  lora_target_modules:
+  - q_proj
+  - v_proj
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 4
+  learning_rate: 5e-5
+  lr_scheduler_type: linear
+  num_train_epochs: 5
+  fp16: true
+  gradient_checkpointing: false
+  seed: 42
+  weight_decay: 0.01
+  report_to: wandb
+infer:
+  test_path: /data/ephemeral/home/ksat_data/test.csv
+  output_path: ./output/fold_02.csv
+  use_adapter: true
+  adapter_path: null
+wandb:
+  project: koreasat_yejoon
+  entity: hakiful-ai
+  name: skt/A.X-4.0-Light_r16_lr5e-5_linear_warmup500_fold_02
