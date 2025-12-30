@@ -4,7 +4,7 @@
 # 실행 모드 ("train" 또는 "test")
 # - train: train.csv 사용, F1 Score 계산, wandb 기록
 # - test: test.csv 사용, 결과만 저장
-mode: "train" # "train" 또는 "test"로 설정
+mode: "test" # "train" 또는 "test"로 설정
 
 api:
   base_url: "http://10.28.228.126:30449/v1"  # OpenAPI 호환 서버 URL (수정 가능)
