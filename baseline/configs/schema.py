@@ -40,6 +40,11 @@ class TrainConfig(BaseModel):
     lora_target_modules: list[str]
     lora_bias: Literal["none", "all", "lora_only"] = "none"
     lora_task_type: Literal["CAUSAL_LM"] = "CAUSAL_LM"
+    use_rslora: bool = False
+    use_dora: bool = False
+
+    # NEFTune
+    neftune_noise_alpha: float | None = None
 
     # Trainer hyperparams
     per_device_train_batch_size: int = Field(..., gt=0)

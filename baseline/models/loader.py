@@ -87,6 +87,8 @@ def load_for_train(
             bias="none",
             use_gradient_checkpointing=config.train.gradient_checkpointing,  # !
             random_state=config.train.seed,
+            use_rslora=config.train.use_rslora,
+            use_dora=config.train.use_dora,
         )
 
         tokenizer.padding_side = "right"
