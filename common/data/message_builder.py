@@ -10,27 +10,32 @@ def build_chat_messages(
 ) -> dict[str, list[dict[str, str]]]:
     """
     Build chat-style messages from a QAExample.
+
+    Handles two data formats:
+    1. CSV format: paragraph, question, choices are all populated
+    2. JSONL (CoT) format: paragraph is empty, question contains full formatted prompt
     """
-    user_message: str = format_question_message(
-        paragraph=example.paragraph,
-        question=example.question,
-        question_plus=example.question_plus,
-        choices_list=example.choices,
-    )
+    # Check if this is JSONL format (paragraph empty, choices empty)
+    # In this case, question already contains the full formatted prompt
+    if not example.paragraph and not example.choices:
+        user_message = example.question
+    else:
+        user_message = format_question_message(
+            paragraph=example.paragraph,
+            question=example.question,
+            question_plus=example.question_plus,
+            choices_list=example.choices,
+        )
 
     system_content = SYSTEM_PROMPT_COT if use_cot else SYSTEM_PROMPT
 
     # Gemma and some other models might not support 'system' role in chat template.
-    # To be safe, we prepend the system instruction to the user message.
-    # Or strict adherence: check if we want to keep system role.
-    # Given the user wants to ENFORCE it, let's prepend it to user message if use_cot is True.
-
+    # For CoT, we prepend the system instruction to the user message.
     if use_cot:
-    user_message = f"{system_content}\n\n{user_message}"
-        # If we merged it, we only send user message
-    messages: list[dict[str, str]] = [
-        {"role": "user", "content": user_message},
-    ]
+        user_message = f"{system_content}\n\n{user_message}"
+        messages: list[dict[str, str]] = [
+            {"role": "user", "content": user_message},
+        ]
     else:
         messages: list[dict[str, str]] = [
             {"role": "system", "content": system_content},
@@ -43,11 +48,8 @@ def build_chat_messages(
         # CoT: Formatting Reasoning
         if example.reasoning is not None:
             # Gemma 3 or Generic CoT Style
-            # Example:
-            # reasoning
-            #
-            # 정답
-            assistant_content = f"{example.reasoning}\n\n{example.answer}"
+            # Format: reasoning + answer
+            assistant_content = f"{example.reasoning}\n\n정답: {example.answer}"
 
         messages.append({"role": "assistant", "content": assistant_content})
 
