@@ -124,12 +124,9 @@ def _load_from_jsonl(file_path: str) -> list[QAExample]:
                 # If 0-indexed: 2 is 3rd option.
                 # We need to standardize to what SFTTrainer/Collator expects.
                 # CSV loader returns '1', '2', ...
-                # So if idx is 0-based, we likely need to add 1.
-                # Let's assume 0-based for now (standard for python lists in JSON).
+                # Original JSONL data uses 1-based indexing (1, 2, 3, 4, 5)
                 try:
-                    answer_idx = str(
-                        output_data["ans"]["idx"] + 1
-                    )  # Convert to 1-based string
+                    answer_idx = str(output_data["ans"]["idx"])  # Already 1-based
                 except (KeyError, TypeError):
                     answer_idx = None
 

@@ -14,7 +14,14 @@ def build_chat_messages(
     Handles two data formats:
     1. CSV format: paragraph, question, choices are all populated
     2. JSONL (CoT) format: paragraph is empty, question contains full formatted prompt
+
+    CoT mode is automatically enabled if:
+    - use_cot=True is explicitly set, OR
+    - example.reasoning is not None (JSONL data with reasoning)
     """
+    # Auto-detect CoT mode from reasoning presence
+    is_cot_mode = use_cot or (example.reasoning is not None)
+
     # Check if this is JSONL format (paragraph empty, choices empty)
     # In this case, question already contains the full formatted prompt
     if not example.paragraph and not example.choices:
@@ -27,11 +34,11 @@ def build_chat_messages(
             choices_list=example.choices,
         )
 
-    system_content = SYSTEM_PROMPT_COT if use_cot else SYSTEM_PROMPT
+    system_content = SYSTEM_PROMPT_COT if is_cot_mode else SYSTEM_PROMPT
 
     # Gemma and some other models might not support 'system' role in chat template.
     # For CoT, we prepend the system instruction to the user message.
-    if use_cot:
+    if is_cot_mode:
         user_message = f"{system_content}\n\n{user_message}"
         messages: list[dict[str, str]] = [
             {"role": "user", "content": user_message},

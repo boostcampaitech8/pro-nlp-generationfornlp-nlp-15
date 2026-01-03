@@ -13,17 +13,17 @@ tokenizer:
 train:
   # train_path: "/data/ephemeral/home/ksat_data/splitted/train.csv"
   train_path: "/data/ephemeral/home/ksat_data/gold_training_data.jsonl"
-  eval_path: "/data/ephemeral/home/ksat_data/splitted/valid.csv"
+  eval_path: null  # Use stratified split from train_path (CoT data)
   output_dir: "./outputs_gemma"
 
   # LoRA (train only)
-  lora_r: 16
-  lora_alpha: 32
+  lora_r: 32
+  lora_alpha: 64
   lora_dropout: 0
   lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
   use_rslora: false
   use_dora: false
-  neftune_noise_alpha: null # null or gt 0
+  neftune_noise_alpha: 5 # null or gt 0
 
   # trainer
   per_device_train_batch_size: 1
@@ -54,7 +54,7 @@ infer:
 wandb:
   project: "koreasat_woohyun"
   entity: "hakiful-ai"
-  name: "batch_4_lr_5e-5_loradrop_0.05_epoch_5_infer"
+  name: "cot_reasoning"
   group: "unsloth/gemma-3-27b-it-bnb-4bit"
-  job_type: "infer"
-  notes: "full_lora, r: 16, alpha: 32, dropout: 0.05, bzs: 1, accm: 4, lr: 5e-5"
+  job_type: "train"
+  notes: "lora, r: 32, alpha: 64, bzs: 4, lr: 5e-5, neftune_noise_alpha: 5, epoch: 5 / use_cot"

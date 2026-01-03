@@ -65,19 +65,31 @@ def main() -> None:
             require_answer=True,
         )
     else:
-        # Runtime split case
-        log.info(f"Loading train from {config.train.train_path} and splitting")
-        ds = load_text_qa_dataset(
+        # Runtime stratified split case (for CoT training with single JSONL file)
+        log.info(f"Loading train from {config.train.train_path} and stratified splitting")
+        full_ds = load_text_qa_dataset(
             file_path=str(config.train.train_path),
             tokenizer=tokenizer,
             require_answer=True,
         )
-        split = ds.train_test_split(
+        
+        # Stratified split using sklearn
+        from sklearn.model_selection import train_test_split
+        
+        indices = list(range(len(full_ds)))
+        answers = full_ds["answer"]
+        
+        train_indices, val_indices = train_test_split(
+            indices,
             test_size=0.1,
-            seed=config.train.seed,
+            stratify=answers,
+            random_state=config.train.seed,
         )
-        train_ds = split["train"]
-        val_ds = split["test"]
+        
+        train_ds = full_ds.select(train_indices)
+        val_ds = full_ds.select(val_indices)
+        
+        log.info(f"Stratified split: train={len(train_ds)}, val={len(val_ds)}")
 
     log.info("Dataset sizes: train=%d val=%d", len(train_ds), len(val_ds))
 

@@ -22,9 +22,10 @@ def load_text_qa_dataset(
     TRL 0.26.1에서 completion_only_loss가 작동하려면:
     - 'prompt' 컬럼: system + user 메시지 (학습에서 제외됨)
     - 'completion' 컬럼: assistant 응답 (학습 대상)
+    - 'answer' 컬럼: 정답 (stratified split용)
 
     Returns:
-        Dataset with 'prompt' and 'completion' columns.
+        Dataset with 'prompt', 'completion', and 'answer' columns.
     """
     logger.info("[SFTDataLoader] Loading QA examples")
     examples = load_qa_examples_from_file(file_path)
@@ -63,7 +64,11 @@ def load_text_qa_dataset(
             )
             completion = assistant_content + tokenizer.eos_token
 
-        data.append({"prompt": prompt, "completion": completion})
+        data.append({
+            "prompt": prompt, 
+            "completion": completion,
+            "answer": example.answer,  # For stratified split
+        })
 
     dataset = Dataset.from_list(data)
     logger.info(
