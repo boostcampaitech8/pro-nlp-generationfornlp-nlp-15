@@ -3,7 +3,7 @@ import pandas as pd
 from datasets import Dataset
 from transformers import PreTrainedTokenizerBase
 
-from .read_csv import load_qa_examples_from_csv
+from .read_data import load_qa_examples_from_file
 from .message_builder import build_chat_messages
 from .chat_tokenizer import tokenize_chat_dataset, filter_by_max_length
 
@@ -27,7 +27,7 @@ def load_text_qa_dataset(
         Dataset with 'prompt' and 'completion' columns.
     """
     logger.info("[SFTDataLoader] Loading QA examples")
-    examples = load_qa_examples_from_csv(file_path)
+    examples = load_qa_examples_from_file(file_path)
 
     if require_answer:
         examples = [ex for ex in examples if ex.answer is not None]
@@ -85,31 +85,35 @@ def load_tokenized_qa_dataset(
 ) -> Dataset:
 
     logger.info("[SFTDataLoader] Loading QA examples")
-    examples = load_qa_examples_from_csv(file_path)
+    examples = load_qa_examples_from_file(file_path)
 
     if require_answer:
         examples = [ex for ex in examples if ex.answer is not None]
 
     logger.info(f"[SFTDataLoader] Building chat messages (use_cot={use_cot})")
-    
+
     formatted: list[dict[str, list[dict[str, str]]]] = []
     for example in examples:
         msg_dict = build_chat_messages(example, use_cot=use_cot)
-        
+
         # If exclude_answer is True, strip the assistant message containing the answer
         if exclude_answer:
-            msg_dict["messages"] = [m for m in msg_dict["messages"] if m["role"] != "assistant"]
-            
+            msg_dict["messages"] = [
+                m for m in msg_dict["messages"] if m["role"] != "assistant"
+            ]
+
         formatted.append(msg_dict)
-    
+
     dataset = Dataset.from_list(formatted)
 
-    logger.info(f"[SFTDataLoader] Tokenizing (add_generation_prompt={add_generation_prompt}, enable_thinking={enable_thinking})")
+    logger.info(
+        f"[SFTDataLoader] Tokenizing (add_generation_prompt={add_generation_prompt}, enable_thinking={enable_thinking})"
+    )
     tokenized_ds = tokenize_chat_dataset(
-        dataset, 
-        tokenizer, 
-        add_generation_prompt=add_generation_prompt, 
-        enable_thinking=enable_thinking
+        dataset,
+        tokenizer,
+        add_generation_prompt=add_generation_prompt,
+        enable_thinking=enable_thinking,
     )
 
     # Optional: Filter by max_length if needed. Infer.py passes max_length.
@@ -121,8 +125,8 @@ def load_tokenized_qa_dataset(
     # In my previous view, `load_tokenized_qa_dataset` had `do_filter_by_max_length` arg but it was removed?
     # The current signature has `max_length: int`.
     # I'll add filtering logic using max_length.
-    
+
     # logger.info(f"[SFTDataLoader] Filtering samples > {max_length} tokens")
     # tokenized_ds = filter_by_max_length(tokenized_ds, max_length)
-    
+
     return tokenized_ds

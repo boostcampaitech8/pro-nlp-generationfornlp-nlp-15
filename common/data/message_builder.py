@@ -24,13 +24,13 @@ def build_chat_messages(
     # To be safe, we prepend the system instruction to the user message.
     # Or strict adherence: check if we want to keep system role.
     # Given the user wants to ENFORCE it, let's prepend it to user message if use_cot is True.
-    
+
     if use_cot:
-        user_message = f"{system_content}\n\n{user_message}"
+    user_message = f"{system_content}\n\n{user_message}"
         # If we merged it, we only send user message
-        messages: list[dict[str, str]] = [
-            {"role": "user", "content": user_message},
-        ]
+    messages: list[dict[str, str]] = [
+        {"role": "user", "content": user_message},
+    ]
     else:
         messages: list[dict[str, str]] = [
             {"role": "system", "content": system_content},
@@ -38,8 +38,17 @@ def build_chat_messages(
         ]
 
     if example.answer is not None:
-        messages.append(
-            {"role": "assistant", "content": example.answer}
-        )
+        assistant_content = example.answer
+
+        # CoT: Formatting Reasoning
+        if example.reasoning is not None:
+            # Gemma 3 or Generic CoT Style
+            # Example:
+            # reasoning
+            #
+            # 정답
+            assistant_content = f"{example.reasoning}\n\n{example.answer}"
+
+        messages.append({"role": "assistant", "content": assistant_content})
 
     return {"messages": messages}
