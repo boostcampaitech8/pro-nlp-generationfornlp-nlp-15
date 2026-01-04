@@ -91,6 +91,7 @@ class InferConfig(BaseModel):
 
     # 추론 방식 선택
     inference_method: Literal["logits", "generate"] = "logits"
+    batch_size: int = Field(1, gt=0)
 
 
 class WandBConfig(BaseModel):

@@ -154,21 +154,29 @@ class SFTTrainingRunner:
         logger.info("Saved final adapter to %s", out_dir)
 
         # WandB Artifact 업로드: eval_loss가 가장 낮았던 가중치를 업로드합니다.
-        if (
-            self.config.train.report_to == "wandb"
-            and wandb is not None
-            and wandb.run is not None
-        ):
-            logger.info("Uploading adapter to WandB Artifacts...")
+        if self.config.train.report_to == "wandb":
+            if wandb is None:
+                logger.warning("WandB module is not available.")
+            elif wandb.run is None:
+                logger.warning("WandB run is None. Artifact upload skipped. (Did Trainer close it?)")
+            else:
+                logger.info(f"Uploading adapter to WandB Artifacts (Run: {wandb.run.name})...")
 
-            run_name = wandb.run.name.replace("/", "-")
-            artifact = wandb.Artifact(
-                name=f"{run_name or 'model'}-adapter",
-                type="model",
-                description="Final (best) LoRA adapter",
-            )
-            artifact.add_dir(str(out_dir))
-            wandb.log_artifact(artifact)
-            logger.info("Artifact uploaded successfully.")
+                run_name = wandb.run.name.replace("/", "-")
+                try:
+                    artifact = wandb.Artifact(
+                        name=f"{run_name or 'model'}-adapter",
+                        type="model",
+                        description="Final (best) LoRA adapter",
+                    )
+                    artifact.add_dir(str(out_dir))
+                    wandb.log_artifact(artifact)
+                    logger.info("Artifact logged successfully.")
+                    
+                    # Ensure upload finishes before script exit
+                    wandb.finish()
+                    logger.info("WandB run finished and synced.")
+                except Exception as e:
+                    logger.error(f"Failed to upload artifact: {e}")
 
         return out_dir

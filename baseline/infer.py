@@ -1,11 +1,14 @@
 import argparse
 import logging
+import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
+from torch.utils.data import DataLoader
+from transformers import DataCollatorWithPadding
 
 from .configs.load import load_config
 from .models.loader import load_for_infer
@@ -59,7 +62,6 @@ def main() -> None:
             Path(config.train.output_dir) / "final_adapter"
         )
 
-        # adapter_path가 WandB Artifact 형식인 경우 다운로드(Artifact 형식: entity/project/name:version)
         if str(adapter_path).count("/") >= 2 and ":" in str(adapter_path):
             if wandb.run is None:
                 wandb.init()
@@ -73,73 +75,103 @@ def main() -> None:
     device = next(model.parameters()).device
 
     # 5) tokenized dataset + ids
-    # Generation Mode requires adding the generation prompt
     is_generate_mode = getattr(config.infer, "inference_method", "logits") == "generate"
+    batch_size = getattr(config.infer, "batch_size", 1)
     
+    # CRITICAL: Batch generation requires LEFT padding
+    if is_generate_mode and batch_size > 1:
+        log.info("Setting padding_side to 'left' for batch generation.")
+        tokenizer.padding_side = "left"
+        # Ensure pad_token is set
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+            tokenizer.pad_token_id = tokenizer.eos_token_id
+
     ds = load_tokenized_qa_dataset(
         file_path=str(config.infer.test_path),
         tokenizer=tokenizer,
         max_length=config.tokenizer.max_seq_length,
         require_answer=False,
-        add_generation_prompt=is_generate_mode,  # Pass generation prompt flag
-        enable_thinking=is_generate_mode, # Enable thinking if generation mode
-        use_cot=True, # Always use CoT system prompt to match training format
-        exclude_answer=True, # CRITICAL: Always correct for valid/test sets to prevent feeding answer
+        add_generation_prompt=is_generate_mode,
+        enable_thinking=is_generate_mode,
+        use_cot=True,
+        exclude_answer=True,
     )
     test_df = pd.read_csv(config.infer.test_path)
     ids = test_df["id"].astype(str).tolist()
 
+    # Data Collator (auto-pads to max length in batch)
+    data_collator = DataCollatorWithPadding(tokenizer=tokenizer, padding=True)
+
+    # DataLoader
+    dataloader = DataLoader(
+        ds, 
+        batch_size=batch_size, 
+        collate_fn=data_collator, 
+        shuffle=False
+    )
+
     results: list[dict[str, str]] = []
     
-    # 6-A) Generation Mode
+    # 6-A) Generation Mode (Batch)
     if is_generate_mode:
-        log.info(f"Running Inference in GENERATION mode (Thinking enabled if model supports it)")
-        import re
+        log.info(f"Running Inference in GENERATION mode (Batch Size: {batch_size})")
         
-        # Regex to find answer: Look for '정답', '답', 'Answer' followed by a number 1-5
-        # We look for the last occurrence as the final conclusion
+        # Regex for answer parsing
         answer_pattern = re.compile(r'(?:정답|답|Answer)\s*:?\s*.*?([1-5])')
 
-        for i, item in tqdm(enumerate(ds), total=len(ds), desc="Gen-Inference"):
-            input_ids = torch.tensor(item["input_ids"], dtype=torch.long, device=device).unsqueeze(0)
+        for batch_idx, batch in tqdm(enumerate(dataloader), total=len(dataloader), desc="Gen-Inference"):
+            # Move batch to device
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
             
-            # Generate
             with torch.inference_mode():
                 generated_ids = model.generate(
                     input_ids=input_ids,
+                    attention_mask=attention_mask,
                     max_new_tokens=getattr(config.infer, "max_new_tokens", 4096),
-                    do_sample=True, # Thinking usually works best with sampling
+                    do_sample=True,
                     temperature=0.7,
+                    pad_token_id=tokenizer.pad_token_id,
                 )
             
-            # Decode only new tokens
-            new_tokens = generated_ids[0][len(input_ids[0]):]
-            response = tokenizer.decode(new_tokens, skip_special_tokens=True)
+            # Decode batch
+            # Slice only new tokens
+            new_tokens_list = [
+                out_ids[len(in_ids):] 
+                for in_ids, out_ids in zip(input_ids, generated_ids)
+            ]
+            responses = tokenizer.batch_decode(new_tokens_list, skip_special_tokens=True)
             
-            # Parse Answer
-            matches = answer_pattern.findall(response)
-            if matches:
-                pred = matches[-1] # Take the last one found
-            else:
-                # Fallback: try to find just any single digit 1-5 at the very end of text
-                # or just default to 1 if totally failed (rare if model follows instruction)
-                simple_digit = re.findall(r'([1-5])', response)
-                pred = simple_digit[-1] if simple_digit else "1"
+            # Calculate global indices
+            start_idx = batch_idx * batch_size
             
-            results.append({"id": ids[i], "answer": pred})
+            for i, response in enumerate(responses):
+                global_idx = start_idx + i
+                if global_idx >= len(ids): break
+                
+                # Parse Answer
+                matches = answer_pattern.findall(response)
+                if matches:
+                    pred = matches[-1]
+                else:
+                    simple_digit = re.findall(r'([1-5])', response)
+                    pred = simple_digit[-1] if simple_digit else "1"
+                
+                results.append({"id": ids[global_idx], "answer": pred})
 
-    # 6-B) Logits Mode (Original)
+    # 6-B) Logits Mode (Serial - or Batch if improved later, but deprecated for CoT)
     else:
         log.info("Running Inference in LOGITS mode (Next Token Prediction)")
         choice_ids = tokenizer.convert_tokens_to_ids(["1", "2", "3", "4", "5"])
         
+        # Logits mode is simpler to keep serial for now or update similarly if needed
+        # But user is moving to Generate mode.
+        # Let's keep original serial loop for safety if someone reverts config
+        
         with torch.inference_mode():
-            for i, item in tqdm(
-                enumerate(ds), total=len(ds), desc="Inference", mininterval=0.5
-            ):
-                input_ids = torch.tensor(
-                    item["input_ids"], dtype=torch.long, device=device
-                ).unsqueeze(0)
+            for i, item in tqdm(enumerate(ds), total=len(ds), desc="Inference"):
+                input_ids = torch.tensor(item["input_ids"], dtype=torch.long, device=device).unsqueeze(0)
 
                 logits = model(input_ids=input_ids).logits[0, -1, :].float()
                 target_logits = logits[choice_ids]
@@ -154,7 +186,6 @@ def main() -> None:
     log.info("Saved: %s", out_path)
     print(f"[done] saved: {out_path}")
 
-    # 추론 결과 Artifact 업로드
     if wandb.run is not None:
         log.info("Uploading inference results to WandB Artifacts...")
         run_name = wandb.run.name.replace("/", "-")

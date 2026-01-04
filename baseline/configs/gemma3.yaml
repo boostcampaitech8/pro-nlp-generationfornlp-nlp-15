@@ -42,19 +42,20 @@ train:
 
 infer:
   test_path: "/data/ephemeral/home/ksat_data/test.csv"
-  output_path: "batch_4_lr_5e-5_loradrop_0.05_epoch_5.csv"
+  output_path: "cot_reasoning_infer.csv"
 
   # adapter_path가 null이면 {train.output_dir}/final_adapter 사용 (코드에서)
   use_adapter: true
   adapter_path: null
   
-  inference_method: "logits"
+  inference_method: "generate"
+  batch_size: 4
   max_new_tokens: 4096
 
 wandb:
   project: "koreasat_woohyun"
   entity: "hakiful-ai"
-  name: "cot_reasoning"
+  name: "cot_reasoning_infer"
   group: "unsloth/gemma-3-27b-it-bnb-4bit"
-  job_type: "train"
+  job_type: "infer"
   notes: "lora, r: 32, alpha: 64, bzs: 4, lr: 5e-5, neftune_noise_alpha: 5, epoch: 5 / use_cot"
