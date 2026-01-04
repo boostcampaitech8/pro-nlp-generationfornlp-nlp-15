@@ -1,0 +1,22 @@
+api:
+  base_url: "http://10.28.228.126:30449/v1"  # OpenAPI 호환 서버 URL (수정 가능)
+  api_key: "EMPTY"                       # API 키 (로컬 서버의 경우 EMPTY)
+  model_name: "local_model"              # 모델 이름
+  timeout: 120                           # 요청 타임아웃 (초)
+  max_retries: 3                         # 최대 재시도 횟수
+
+inference:
+  # data_path: "/Users/yejoon/Documents/ai tech/ksat_data/data/test.csv"   # 학습 데이터 경로
+  data_path: "/Users/yejoon/Documents/ai tech/ksat_data/augments.csv"   # 학습 데이터 경로
+  output_dir: "./output"                 # 출력 디렉토리
+
+  eval: false                            # evaluation 실행 여부
+  temperature: 0.0                       # 생성 온도 (0.0 = deterministic)
+  max_tokens: 1024                       # 최대 생성 토큰 수
+  seed: 42                               # 랜덤 시드 (재현성 보장, null이면 미사용)
+
+wandb:
+  project: "koreasat_yejoon_prompt"
+  entity: "hakiful-ai"
+  name: "llm_inf"
+  # "exaone-32b/exaone-32b-problem-classification-train"
