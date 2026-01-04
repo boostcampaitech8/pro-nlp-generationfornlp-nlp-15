@@ -284,10 +284,17 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
     use_streaming_save = config['inference'].get('use_streaming_save', True)
     
     if use_multi_agent:
-        print(f"Starting Multi-Agent Inference (max_concurrent={max_concurrent}, Solver + Verifier)...")
+        print(f"Starting Multi-Agent Inference (max_concurrent={max_concurrent}, Primary CoT + Verifier)...")
+        print(f"  - use_type_specific_prompt: {use_type_specific_prompt}")
+        print(f"  - use_cot: {use_cot}")
         
-        # Multi-Agent 프로세서 초기화
-        multi_agent_processor = MultiAgentProcessor(client)
+        # Multi-Agent 프로세서 초기화 (기존 CoT 방식 + Verifier)
+        multi_agent_processor = MultiAgentProcessor(
+            client=client,
+            system_prompt=system_prompt,
+            use_type_specific_prompt=use_type_specific_prompt,
+            use_cot=use_cot,
+        )
         
         # Multi-Agent 방식으로 처리
         tasks = [
