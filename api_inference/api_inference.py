@@ -25,6 +25,7 @@ from .utils.metrics import (
 )
 from .utils.output_handler import save_results_with_raw, StreamingResultSaver
 from .prompts import QuestionType, format_question_message, create_messages, SYSTEM_PROMPTS
+from .agents import MultiAgentProcessor
 from common.utils.wandb import set_wandb_env
 from common.utils.logger import setup_logging
 
@@ -273,15 +274,47 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
     # CoT (Chain of Thought) 프롬프트 사용 여부
     use_cot = config['inference'].get('use_cot', False)
     
+    # Multi-Agent 모드 사용 여부
+    use_multi_agent = config['inference'].get('use_multi_agent', False)
+    
     # 배치 저장 크기 (기본값: 50)
     save_batch_size = config['inference'].get('save_batch_size', 50)
     
     # 실시간 저장 모드 사용 여부
     use_streaming_save = config['inference'].get('use_streaming_save', True)
     
-    print(f"Starting API Inference (max_concurrent={max_concurrent}, max_retry={MAX_RETRY}, use_type_specific_prompt={use_type_specific_prompt}, use_cot={use_cot}, streaming_save={use_streaming_save})...")
+    if use_multi_agent:
+        print(f"Starting Multi-Agent Inference (max_concurrent={max_concurrent}, Solver + Verifier)...")
+        
+        # Multi-Agent 프로세서 초기화
+        multi_agent_processor = MultiAgentProcessor(client)
+        
+        # Multi-Agent 방식으로 처리
+        tasks = [
+            multi_agent_processor.process_single_item(item, semaphore)
+            for item in test_data
+        ]
+        multi_agent_results = await tqdm_asyncio.gather(*tasks, desc="Multi-Agent Inference")
+        
+        # 결과 변환 (기존 형식과 호환)
+        results = [r.to_output_dict() for r in multi_agent_results]
+        
+        # ID 순서대로 정렬
+        id_order = {item['id']: idx for idx, item in enumerate(test_data)}
+        results = sorted(results, key=lambda x: id_order[x['id']])
+        
+        # 결과 저장
+        output_path, raw_output_path = save_results_with_raw(
+            results, config['data']['output_dir'], type_stats
+        )
+        
+        # Multi-Agent 통계 출력
+        verifier_used_count = sum(1 for r in multi_agent_results if r.verifier_used)
+        print(f"[Multi-Agent Stats] Verifier used: {verifier_used_count}/{len(results)}")
     
-    if use_streaming_save:
+    elif use_streaming_save:
+        print(f"Starting API Inference (max_concurrent={max_concurrent}, max_retry={MAX_RETRY}, use_type_specific_prompt={use_type_specific_prompt}, use_cot={use_cot}, streaming_save={use_streaming_save})...")
+        
         # 실시간/배치 저장 모드
         saver = StreamingResultSaver(config['data']['output_dir'], batch_size=save_batch_size)
         
@@ -296,6 +329,8 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
         # 남은 결과 저장 및 최종화
         output_path, raw_output_path = saver.finalize(type_stats)
     else:
+        print(f"Starting API Inference (max_concurrent={max_concurrent}, max_retry={MAX_RETRY}, use_type_specific_prompt={use_type_specific_prompt}, use_cot={use_cot}, streaming_save={use_streaming_save})...")
+        
         # 기존 방식: 한 번에 저장
         tasks = [
             process_single_item(client, item, system_prompt, semaphore, use_type_specific_prompt, use_cot)

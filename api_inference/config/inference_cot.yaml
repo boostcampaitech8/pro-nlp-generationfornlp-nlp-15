@@ -26,14 +26,17 @@ inference:
   system_prompt: "지문을 읽고 내용을 정리하시오. 각 선지별로 정답을 선택하기 위한 근거를 서술한 후 최종적으로 답변을 제시하시오, 정답을 제출할때는 정답: 숫자 형식으로 답변하시오"  # 시스템 프롬프트
   max_concurrent: 5                     # 동시 요청 수 (병렬 처리)
   tool_choice: "auto"                    # Function call 선택 방식 (vLLM Hermes: "auto" 권장)
-  use_type_specific_prompt: true         # 문제 유형별 프롬프트 사용 여부 (true: 유형별, false: 기본)
+  use_type_specific_prompt: false         # 문제 유형별 프롬프트 사용 여부 (true: 유형별, false: 기본)
   use_cot: true                          # CoT 사용
   use_streaming_save: false               # 실시간 저장 모드 (true: 배치마다 저장, false: 완료 후 한번에 저장)
   save_batch_size: 20                    # 배치 저장 크기 (use_streaming_save=true일 때 적용)
-  classification_votes: 3                # 문제 유형 분류 투표 횟수 (1=단일, 3이상=다수결, 동점시 희귀 유형 우선)
+  classification_votes: 1                # 문제 유형 분류 투표 횟수 (1=단일, 3이상=다수결, 동점시 희귀 유형 우선)
+  
+  # Multi-Agent 설정
+  use_multi_agent: true                 # Multi-Agent 모드 사용 여부 (true: Solver+Verifier, false: 기존 방식)
 
 wandb:
   project: "koreasat_jisoo_prompt"
   entity: "hakiful-ai"
-  name: "problem-classification-with-llm-cot"
+  name: "base-prompt-cot-multi-agent"
 
