@@ -1,0 +1,56 @@
+# Multi-Agent Inference Configuration (80B Verifier 포함)
+# 1차 Agent: 기존 CoT 방식
+# 2차 Verifier: 80B 모델로 검증
+
+# 실행 모드 ("train" 또는 "test")
+# - train: train.csv 사용, F1 Score 계산, wandb 기록
+# - test: test.csv 사용, 결과만 저장
+mode: "train" # "train" 또는 "test"로 설정
+
+# 1차 Agent (Primary Agent) 설정
+api:
+  base_url: "http://10.28.228.126:30449/v1"  # 1차 모델 API URL (32B 등)
+  api_key: "EMPTY"                       # API 키 (로컬 서버의 경우 EMPTY)
+  model_name: "local_model"              # 모델 이름
+  timeout: 120                           # 요청 타임아웃 (초)
+  max_retries: 3                         # 최대 재시도 횟수
+
+# 80B Verifier 설정
+verifier_80b:
+  base_url: "http://10.28.228.79:30390/v1"  # 80B 모델 API URL
+  api_key: "EMPTY"                       # API 키 (로컬 서버의 경우 EMPTY)
+  model_name: "local_model"              # 모델 이름
+  timeout: 180                           # 요청 타임아웃 (초, 80B는 느리므로 더 길게)
+  temperature: 0.0                       # 생성 온도
+  max_tokens: 2048                       # 최대 생성 토큰 수
+  
+  # Verifier 호출 조건
+  verify_all: true                  # true: 모든 문제 검증, false: 조건부
+  logprob_threshold: null                # 확신도 임계값 (null이면 파싱 실패 시만, 추후 구현)
+  max_concurrent: 3                      # 80B Verifier 동시 요청 수 (느리므로 낮게 설정)
+
+data:
+  train_path: "data/balanced_train.csv"  # 학습 데이터 경로
+  test_path: "data/test.csv"             # 테스트 데이터 경로
+  output_dir: "data/agent_80b_train"     # 출력 디렉토리
+  sample_size: null                      # 샘플 수 제한 (null이면 전체, 숫자면 해당 개수만 사용)
+  input_csv: "data/train_cot_logit_both_fail.csv"    # 기존 32B CoT 결과 CSV 파일 경로 (지정하면 80B Verifier만 실행, 예: "data/train_80b_verification.csv")
+
+inference:
+  temperature: 0.0                       # 생성 온도 (0.0 = deterministic)
+  max_tokens: 1024                       # 최대 생성 토큰 수
+  seed: 42                               # 랜덤 시드 (재현성 보장, null이면 미사용)
+  system_prompt: "지문을 읽고 내용을 정리하시오. 각 선지별로 정답을 선택하기 위한 근거를 서술한 후 최종적으로 답변을 제시하시오, 정답을 제출할때는 정답: 숫자 형식으로 답변하시오"  # 시스템 프롬프트
+  max_concurrent: 5                      # 동시 요청 수 (병렬 처리)
+  tool_choice: "auto"                    # Function call 선택 방식 (vLLM Hermes: "auto" 권장)
+  use_type_specific_prompt: false        # 문제 유형별 프롬프트 사용 여부 (true: 유형별, false: 기본)
+  use_cot: true                          # CoT(Chain of Thought) 프롬프트 사용 여부
+  use_streaming_save: false              # 실시간 저장 모드 (true: 배치마다 저장, false: 완료 후 한번에 저장)
+  save_batch_size: 20                    # 배치 저장 크기 (use_streaming_save=true일 때 적용)
+  classification_votes: 1                # 문제 유형 분류 투표 횟수 (1=단일, 3이상=다수결, 동점시 희귀 유형 우선)
+
+wandb:
+  project: "koreasat_jisoo_prompt"
+  entity: "hakiful-ai"
+  name: "multi-agent-80b-verifier"
+
