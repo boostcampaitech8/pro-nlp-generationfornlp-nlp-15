@@ -1,0 +1,42 @@
+# API Inference Configuration - With CoT
+# OpenAPI 호환 서버용 추론 설정 파일 (CoT 사용)
+
+# 실행 모드 ("train" 또는 "test")
+# - train: train.csv 사용, F1 Score 계산, wandb 기록
+# - test: test.csv 사용, 결과만 저장
+mode: "test" # "train" 또는 "test"로 설정
+
+api:
+  base_url: "http://10.28.228.126:30449/v1"  # OpenAPI 호환 서버 URL (수정 가능)
+  api_key: "EMPTY"                       # API 키 (로컬 서버의 경우 EMPTY)
+  model_name: "local_model"              # 모델 이름
+  timeout: 120                           # 요청 타임아웃 (초)
+  max_retries: 3                         # 최대 재시도 횟수
+
+data:
+  train_path: "data/balanced_train.csv"           # 학습 데이터 경로
+  test_path: "data/test.csv"             # 테스트 데이터 경로
+  output_dir: "data/cot"                 # 출력 디렉토리 (CoT 사용 결과)
+  sample_size: null                      # 샘플 수 제한 (null이면 전체, 숫자면 해당 개수만 사용)
+
+inference:
+  temperature: 0.0                         # 생성 온도 (0.0 = deterministic)
+  max_tokens: 1024                       # 최대 생성 토큰 수
+  seed: 42                               # 랜덤 시드 (재현성 보장, null이면 미사용)
+  system_prompt: "지문을 읽고 내용을 정리하시오. 각 선지별로 정답을 선택하기 위한 근거를 서술한 후 최종적으로 답변을 제시하시오, 정답을 제출할때는 정답: 숫자 형식으로 답변하시오"  # 시스템 프롬프트
+  max_concurrent: 5                     # 동시 요청 수 (병렬 처리)
+  tool_choice: "auto"                    # Function call 선택 방식 (vLLM Hermes: "auto" 권장)
+  use_type_specific_prompt: false         # 문제 유형별 프롬프트 사용 여부 (true: 유형별, false: 기본)
+  use_cot: true                          # CoT 사용
+  use_streaming_save: false               # 실시간 저장 모드 (true: 배치마다 저장, false: 완료 후 한번에 저장)
+  save_batch_size: 20                    # 배치 저장 크기 (use_streaming_save=true일 때 적용)
+  classification_votes: 1                # 문제 유형 분류 투표 횟수 (1=단일, 3이상=다수결, 동점시 희귀 유형 우선)
+  
+  # Multi-Agent 설정
+  use_multi_agent: true                 # Multi-Agent 모드 사용 여부 (true: Solver+Verifier, false: 기존 방식)
+
+wandb:
+  project: "koreasat_jisoo_prompt"
+  entity: "hakiful-ai"
+  name: "base-prompt-cot-multi-agent"
+

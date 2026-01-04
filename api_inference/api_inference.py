@@ -242,29 +242,38 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
     if effective_sample_size is not None and effective_sample_size > 0:
         print(f"[Sample Mode] Will use {effective_sample_size} samples")
 
+    # 유형별 프롬프트 사용 여부 (LLM 분류 전에 읽어야 함)
+    use_type_specific_prompt = config['inference'].get('use_type_specific_prompt', True)
+    
     # 문제 유형 분류 투표 횟수 (다수결 방식)
     classification_votes = config['inference'].get('classification_votes', 1)
-    if classification_votes > 1:
-        print(f"[Classification] Using majority vote with {classification_votes} votes")
+    
+    # use_type_specific_prompt가 false면 LLM 분류 스킵
+    if use_type_specific_prompt:
+        if classification_votes > 1:
+            print(f"[Classification] Using LLM classification with {classification_votes} votes")
+        else:
+            print("[Classification] Using LLM classification")
+    else:
+        print("[Classification] Skipped (use_type_specific_prompt=false)")
 
     test_data = await load_test_data(
         data_path,
         llm_client=client,
         system_prompt=system_prompt,
         semaphore=semaphore,
-        sample_size=effective_sample_size,  # yaml 설정도 반영된 값 전달
+        sample_size=effective_sample_size,
         classification_votes=classification_votes,
+        skip_classification=not use_type_specific_prompt,  # false면 분류 스킵
     )
     
     # 문제 유형별 통계 출력
     type_stats = get_question_type_stats(test_data)
-    print("=== 문제 유형별 통계 ===")
-    for qtype, count in type_stats.items():
-        print(f"  {qtype}: {count}개")
-    print("========================")
-    
-    # 유형별 프롬프트 사용 여부
-    use_type_specific_prompt = config['inference'].get('use_type_specific_prompt', True)
+    if use_type_specific_prompt:
+        print("=== 문제 유형별 통계 ===")
+        for qtype, count in type_stats.items():
+            print(f"  {qtype}: {count}개")
+        print("========================")
     
     # 시스템 프롬프트 (유형별 프롬프트 미사용 시에만 적용)
     system_prompt = config['inference'].get(
