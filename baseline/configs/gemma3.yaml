@@ -49,8 +49,8 @@ infer:
   adapter_path: null
   
   inference_method: "generate"
-  batch_size: 4
-  max_new_tokens: 4096
+  batch_size: 1
+  max_new_tokens: 1024
 
 wandb:
   project: "koreasat_woohyun"

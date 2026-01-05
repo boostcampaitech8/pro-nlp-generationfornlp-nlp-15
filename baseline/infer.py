@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from transformers import DataCollatorWithPadding
+from transformers import DataCollatorWithPadding, StoppingCriteria, StoppingCriteriaList
 
 from .configs.load import load_config
 from .models.loader import load_for_infer
@@ -18,6 +18,37 @@ from common.utils.wandb import set_wandb_env
 from common.data.load_dataset import load_tokenized_qa_dataset
 
 import wandb
+
+
+class AnswerStoppingCriteria(StoppingCriteria):
+    """
+    Custom stopping criteria to halt generation when the answer pattern is detected.
+    This prevents the model from generating unnecessary text after providing the answer.
+    """
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
+        # Regex to match "Answer: [1-5]" pattern
+        # Strict pattern: Newline + "정답/Answer" + Colon(:) + Number
+        # Matches: "\n정답: 1", "\nAnswer: 3"
+        # Excludes: "candidate answer 1", "answer 1 is wrong"
+        self.pattern = re.compile(r'(?:^|\n)\s*(?:정답|답|Answer)\s*:\s*([1-5])')
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> bool:
+        # Check every sequence in the batch
+        # Return True only if ALL sequences have found the answer
+        # This prevents cutting off other samples in a batch that are still thinking
+        
+        # Batch decoding is somewhat expensive per step, but necessary for regex checking
+        # Given the model forward pass cost, this is usually acceptable
+        decoded_texts = self.tokenizer.batch_decode(input_ids, skip_special_tokens=True)
+        
+        matches = 0
+        for text in decoded_texts:
+            if self.pattern.search(text):
+                matches += 1
+        
+        # Stop only if all samples in the batch have produced an answer
+        return matches == len(decoded_texts)
 
 
 def parse_args() -> argparse.Namespace:
@@ -82,7 +113,6 @@ def main() -> None:
     if is_generate_mode and batch_size > 1:
         log.info("Setting padding_side to 'left' for batch generation.")
         tokenizer.padding_side = "left"
-        # Ensure pad_token is set
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
             tokenizer.pad_token_id = tokenizer.eos_token_id
@@ -100,7 +130,7 @@ def main() -> None:
     test_df = pd.read_csv(config.infer.test_path)
     ids = test_df["id"].astype(str).tolist()
 
-    # Data Collator (auto-pads to max length in batch)
+    # Data Collator
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer, padding=True)
 
     # DataLoader
@@ -116,12 +146,15 @@ def main() -> None:
     # 6-A) Generation Mode (Batch)
     if is_generate_mode:
         log.info(f"Running Inference in GENERATION mode (Batch Size: {batch_size})")
+        log.info("Early Stopping enabled: Will stop generation when '정답: [1-5]' is detected.")
         
+        # Initialize Stopping Criteria
+        stopping_criteria = StoppingCriteriaList([AnswerStoppingCriteria(tokenizer)])
+
         # Regex for answer parsing
         answer_pattern = re.compile(r'(?:정답|답|Answer)\s*:?\s*.*?([1-5])')
 
         for batch_idx, batch in tqdm(enumerate(dataloader), total=len(dataloader), desc="Gen-Inference"):
-            # Move batch to device
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             
@@ -133,24 +166,22 @@ def main() -> None:
                     do_sample=True,
                     temperature=0.7,
                     pad_token_id=tokenizer.pad_token_id,
+                    stopping_criteria=stopping_criteria, # Apply early stopping
                 )
             
             # Decode batch
-            # Slice only new tokens
             new_tokens_list = [
                 out_ids[len(in_ids):] 
                 for in_ids, out_ids in zip(input_ids, generated_ids)
             ]
             responses = tokenizer.batch_decode(new_tokens_list, skip_special_tokens=True)
             
-            # Calculate global indices
             start_idx = batch_idx * batch_size
             
             for i, response in enumerate(responses):
                 global_idx = start_idx + i
                 if global_idx >= len(ids): break
                 
-                # Parse Answer
                 matches = answer_pattern.findall(response)
                 if matches:
                     pred = matches[-1]
@@ -160,14 +191,10 @@ def main() -> None:
                 
                 results.append({"id": ids[global_idx], "answer": pred})
 
-    # 6-B) Logits Mode (Serial - or Batch if improved later, but deprecated for CoT)
+    # 6-B) Logits Mode
     else:
         log.info("Running Inference in LOGITS mode (Next Token Prediction)")
         choice_ids = tokenizer.convert_tokens_to_ids(["1", "2", "3", "4", "5"])
-        
-        # Logits mode is simpler to keep serial for now or update similarly if needed
-        # But user is moving to Generate mode.
-        # Let's keep original serial loop for safety if someone reverts config
         
         with torch.inference_mode():
             for i, item in tqdm(enumerate(ds), total=len(ds), desc="Inference"):
