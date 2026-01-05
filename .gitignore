@@ -75,3 +75,4 @@ tensorboard/
 /unsloth_compiled_cache
 /unsloth_compiled_cache
 /unsloth_compiled_cache/.locks
+/output_gemma_noncot

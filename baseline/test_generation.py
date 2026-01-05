@@ -41,18 +41,8 @@ def main():
     config = load_config(config_path)
 
     # 2. Load Model & Tokenizer
-    # Smart adapter loading
-    adapter_path = config.infer.adapter_path
-    if not adapter_path:
-        # Check for checkpoint-914 or others
-        output_dir = Path(config.train.output_dir)
-        checkpoints = sorted([d for d in output_dir.glob("checkpoint-*") if d.is_dir()], key=lambda x: int(x.name.split("-")[-1]))
-        if checkpoints:
-            adapter_path = checkpoints[-1]
-            print(f"Found latest checkpoint: {adapter_path}")
-        else:
-            adapter_path = output_dir / "final_adapter"
-    
+    # Explicitly use final_adapter as requested
+    adapter_path = Path("outputs_gemma/final_adapter")
     print(f"Loading model with adapter: {adapter_path}")
     model, tokenizer = load_for_infer(config, adapter_path=adapter_path)
     model.eval()
@@ -64,73 +54,109 @@ def main():
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     # 3. Load Dataset
-    data_path = "/data/ephemeral/home/ksat_data/splitted/valid.csv"
-    print(f"Loading data from {data_path}...")
+    data_path = "/data/ephemeral/home/ksat_data/augments.csv"
+    print(f"Loading AUGMENTS data from {data_path}...")
     # Use load_qa_examples_from_file instead of read_csv for robustness
     examples = load_qa_examples_from_file(data_path)
     print(f"Total examples: {len(examples)}")
 
-    # 4. Sample 1 random example
-    samples = random.sample(examples, 1)
+    # Load IDs from CSV to enable filtering by ID
+    df = pd.read_csv(data_path)
+    all_ids = df["id"].astype(str).tolist()
+    
+    # Create valid pairs of (example, id)
+    # QAExample might be immutable/frozen, so we don't attach .id directly
+    example_pairs = list(zip(examples, all_ids))
 
+    # 4. Sample or Filter Logic
+    incorrect_ids_path = Path("incorrect_ids_augments.txt")
+    if incorrect_ids_path.exists():
+        print(f"Found incorrect IDs file: {incorrect_ids_path}")
+        with open(incorrect_ids_path, "r") as f:
+            target_ids = set(line.strip() for line in f if line.strip())
+        
+        # Filter pairs where id is in target_ids
+        filtered_pairs = [(ex, iid) for ex, iid in example_pairs if iid in target_ids]
+        print(f"Filtered {len(filtered_pairs)} examples from incorrect list.")
+        
+        # PROCESS ALL FAILURES (No sampling)
+        samples = filtered_pairs
+    else:
+        print("No incorrect_ids_augments.txt found. Using all data.")
+        samples = example_pairs
+    
     print("\n" + "="*50)
-    print(" Starting Inference Test on 1 Random Sample (CoT Generation Mode) ")
+    print(f" Starting CoT Generation on {len(samples)} Items (BATCHED) ")
     print("="*50 + "\n")
 
-    stopping_criteria = StoppingCriteriaList([AnswerStoppingCriteria(tokenizer)])
+    # BATCHING SETUP
+    tokenizer.padding_side = "left" # Critical for generation
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
 
-    for i, example in enumerate(samples):
-        print(f"--- Sample {i+1} ---")
-        
-        # Build messages
-        # Use CoT prompt for Gemma 3 to enforce reasoning first
-        # For CoT testing, we explicitly set use_cot=True
+    # Prepare inputs
+    prompts = []
+    metadata = []
+    
+    print("Preparing prompts...")
+    for example, iid in samples:
         messages_dict = build_chat_messages(example, use_cot=True)
-        # CRITICAL: Strip assistant message so we don't feed the answer to the model
         messages = [m for m in messages_dict["messages"] if m["role"] != "assistant"]
         
-        print("\n[DEBUG] Messages dict before template:")
-        for m in messages:
-            print(f"Role: {m['role']}, Content (trunc): {m['content'][:100]}...")
-        print("-" * 20)
-        
-        # Apply chat template
         try:
             text = tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True,
-                enable_thinking=True, # Enable thinking for CoT 
+                messages, tokenize=False, add_generation_prompt=True, enable_thinking=True
             )
         except TypeError:
-            print("Warning: 'enable_thinking' arg not supported in apply_chat_template. Trying without it.")
             text = tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True
+                messages, tokenize=False, add_generation_prompt=True
             )
-            
-        print(f"[Input Prompt]:\n{text}\n\n")
+        prompts.append(text)
+        metadata.append({"id": iid, "question": example.question, "ground_truth": example.answer})
 
-        model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    # Processing Loop
+    batch_size = 4
+    results = []
+    
+    # Simple batch iterator
+    for i in range(0, len(prompts), batch_size):
+        batch_prompts = prompts[i:i+batch_size]
+        batch_meta = metadata[i:i+batch_size]
+        
+        print(f"Processing Batch {i//batch_size + 1}/{(len(prompts)//batch_size)+1} ...")
 
-        # Use TextStreamer for real-time output
-        streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=False)
-
-        # Generate
-        print("[Generating...]")
+        # Tokenize batch
+        inputs = tokenizer(batch_prompts, return_tensors="pt", padding=True, truncation=True).to(model.device)
+        
         with torch.inference_mode():
             generated_ids = model.generate(
-                **model_inputs,
+                **inputs,
                 max_new_tokens=4096,
-                do_sample=True,
+                do_sample=False,
                 temperature=0.7,
-                stopping_criteria=stopping_criteria,
-                streamer=streamer,
+                stopping_criteria=StoppingCriteriaList([AnswerStoppingCriteria(tokenizer)]),
             )
+        
+        # Decode batch
+        input_len = inputs.input_ids.shape[1]
+        new_tokens = generated_ids[:, input_len:]
+        decoded_outputs = tokenizer.batch_decode(new_tokens, skip_special_tokens=True)
+        
+        for j, output_text in enumerate(decoded_outputs):
+             meta = batch_meta[j]
+             print(f"  > ID {meta['id']} generated {len(output_text)} chars")
+             results.append({
+                "id": meta["id"],
+                "question": meta["question"],
+                "ground_truth": meta["ground_truth"],
+                "cot_output": output_text
+            })
 
-        print(f"\n[Ground Truth Answer]: {example.answer}")
-        print("-" * 50 + "\n")
+    # Save to CSV
+    output_csv = "cot_failure_analysis.csv"
+    df_results = pd.DataFrame(results)
+    df_results.to_csv(output_csv, index=False)
+    print(f"\nSaved full analysis to {output_csv}")
 
 if __name__ == "__main__":
     main()
