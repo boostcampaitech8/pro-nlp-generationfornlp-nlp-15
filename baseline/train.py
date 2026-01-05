@@ -16,6 +16,7 @@ from common.data.load_dataset import load_text_qa_dataset
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="baseline/configs/config.yaml")
+    parser.add_argument("--resume_from_checkpoint", type=str, default=None, help="Path to checkpoint to resume from")
     return parser.parse_args()
 
 
@@ -109,7 +110,7 @@ def main() -> None:
         metrics=metrics,
     )
 
-    runner.train()
+    runner.train(resume_from_checkpoint=args.resume_from_checkpoint)
     runner.save_final()
 
 

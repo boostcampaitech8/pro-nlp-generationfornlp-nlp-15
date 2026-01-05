@@ -18,6 +18,54 @@ import wandb
 logger = logging.getLogger(__name__)
 
 
+from transformers import TrainerCallback
+
+class WandbArtifactCallback(TrainerCallback):
+    """
+    Trainer가 종료되면서 WandB run을 닫기 직전에,
+    학습된 모델(Adapter)을 Artifact로 업로드하기 위한 콜백입니다.
+    """
+    def __init__(self, runner: SFTTrainingRunner):
+        self.runner = runner
+
+    def on_train_end(self, args, state, control, **kwargs):
+        # WandB 사용 설정이 아니면 스킵
+        if self.runner.config.train.report_to != "wandb":
+            return
+            
+        if wandb.run is None:
+            logger.warning("[WandbArtifactCallback] WandB run is None. Artifact upload skipped.")
+            return
+
+        # 저장 경로 설정
+        subdir = "final_adapter"
+        out_dir = Path(self.runner.config.train.output_dir) / subdir
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"[WandbArtifactCallback] Saving adapter to {out_dir} before run close...")
+        
+        # 모델 저장 (Trainer 내부 로직과 별개로 안전하게 저장)
+        # kwargs['model']에는 감싸진 모델이 들어있을 수 있으므로 runner의 model 사용 권장
+        # 하지만 SFTTrainer에 의해 학습된 상태인 self.runner.model을 저장
+        self.runner.model.save_pretrained(str(out_dir))
+        self.runner.tokenizer.save_pretrained(str(out_dir))
+        
+        # Artifact 업로드
+        logger.info(f"Uploading artifact to WandB (Run: {wandb.run.name})...")
+        try:
+            run_name = wandb.run.name.replace("/", "-")
+            artifact = wandb.Artifact(
+                name=f"{run_name or 'model'}-adapter",
+                type="model",
+                description="Final (best) LoRA adapter",
+            )
+            artifact.add_dir(str(out_dir))
+            wandb.log_artifact(artifact)
+            logger.info("Artifact logged successfully.")
+        except Exception as e:
+            logger.error(f"Failed to upload artifact: {e}")
+
+
 class SFTTrainingRunner:
     def __init__(
         self,
@@ -134,15 +182,19 @@ class SFTTrainingRunner:
             ),
             peft_config=self.peft_config,
             args=args,
+            callbacks=[WandbArtifactCallback(self)], # 커스텀 콜백 추가
         )
         return self._trainer
 
-    def train(self) -> None:
+    def train(self, resume_from_checkpoint=None) -> None:
         trainer = self.build_trainer()
         logger.info("Starting training...")
-        trainer.train()
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
     def save_final(self, *, subdir: str = "final_adapter") -> Path:
+        """
+        로컬 저장을 위한 메서드 (WandB 업로드는 Callback에서 처리됨)
+        """
         train = self.config.train
         out_dir = Path(train.output_dir) / subdir
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -151,32 +203,5 @@ class SFTTrainingRunner:
         trainer.model.save_pretrained(str(out_dir))
         self.tokenizer.save_pretrained(str(out_dir))
 
-        logger.info("Saved final adapter to %s", out_dir)
-
-        # WandB Artifact 업로드: eval_loss가 가장 낮았던 가중치를 업로드합니다.
-        if self.config.train.report_to == "wandb":
-            if wandb is None:
-                logger.warning("WandB module is not available.")
-            elif wandb.run is None:
-                logger.warning("WandB run is None. Artifact upload skipped. (Did Trainer close it?)")
-            else:
-                logger.info(f"Uploading adapter to WandB Artifacts (Run: {wandb.run.name})...")
-
-                run_name = wandb.run.name.replace("/", "-")
-                try:
-                    artifact = wandb.Artifact(
-                        name=f"{run_name or 'model'}-adapter",
-                        type="model",
-                        description="Final (best) LoRA adapter",
-                    )
-                    artifact.add_dir(str(out_dir))
-                    wandb.log_artifact(artifact)
-                    logger.info("Artifact logged successfully.")
-                    
-                    # Ensure upload finishes before script exit
-                    wandb.finish()
-                    logger.info("WandB run finished and synced.")
-                except Exception as e:
-                    logger.error(f"Failed to upload artifact: {e}")
-
+        logger.info("Saved final adapter to %s (Local)", out_dir)
         return out_dir

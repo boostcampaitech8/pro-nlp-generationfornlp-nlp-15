@@ -11,9 +11,9 @@ tokenizer:
   padding_side: "right"
 
 train:
-  # train_path: "/data/ephemeral/home/ksat_data/splitted/train.csv"
-  train_path: "/data/ephemeral/home/ksat_data/gold_training_data.jsonl"
-  eval_path: null  # Use stratified split from train_path (CoT data)
+  train_path: "/data/ephemeral/home/ksat_data/splitted/train.csv"
+  # train_path: "/data/ephemeral/home/ksat_data/gold_training_data.jsonl" # CoT train
+  eval_path: "/data/ephemeral/home/ksat_data/splitted/valid.csv"  # if null, Use stratified split from train_path (CoT data)
   output_dir: "./outputs_gemma"
 
   # LoRA (train only)
@@ -42,20 +42,20 @@ train:
 
 infer:
   test_path: "/data/ephemeral/home/ksat_data/test.csv"
-  output_path: "cot_reasoning_infer.csv"
+  output_path: "gemma3_fixed.csv"
 
   # adapter_path가 null이면 {train.output_dir}/final_adapter 사용 (코드에서)
   use_adapter: true
   adapter_path: null
   
-  inference_method: "generate"
+  inference_method: "logits"
   batch_size: 1
   max_new_tokens: 1024
 
 wandb:
   project: "koreasat_woohyun"
   entity: "hakiful-ai"
-  name: "cot_reasoning_infer"
+  name: "gemma3_fixed"
   group: "unsloth/gemma-3-27b-it-bnb-4bit"
-  job_type: "infer"
-  notes: "lora, r: 32, alpha: 64, bzs: 4, lr: 5e-5, neftune_noise_alpha: 5, epoch: 5 / use_cot"
+  job_type: "train"
+  notes: "lora, r: 32, alpha: 64, bzs: 4, lr: 5e-5, neftune_noise_alpha: 5, epoch: 5"

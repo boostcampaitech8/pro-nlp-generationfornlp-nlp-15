@@ -124,7 +124,7 @@ def main() -> None:
         require_answer=False,
         add_generation_prompt=is_generate_mode,
         enable_thinking=is_generate_mode,
-        use_cot=True,
+        use_cot=is_generate_mode,  # Only use CoT prompts in generation mode
         exclude_answer=True,
     )
     test_df = pd.read_csv(config.infer.test_path)

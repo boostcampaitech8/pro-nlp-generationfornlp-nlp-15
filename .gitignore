@@ -68,3 +68,10 @@ tensorboard/
 .env
 .env.*
 !.env.example
+
+
+# === outputs ===
+/outputs_gemma
+/unsloth_compiled_cache
+/unsloth_compiled_cache
+/unsloth_compiled_cache/.locks

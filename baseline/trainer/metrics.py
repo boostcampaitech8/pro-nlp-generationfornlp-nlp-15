@@ -182,6 +182,15 @@ class CustomMetrics:
                 if answer_str in self.int_output_map:
                     parsed_labels.append(self.int_output_map[answer_str])
                     valid_indices.append(idx)
+            else:
+                # Fallback: CoT 형식이 아닌 경우 (Standard SFT: "1")
+                # 텍스트에서 1~5 숫자 찾기
+                simple_digit = re.findall(r'([1-5])', decoded_text)
+                if simple_digit:
+                    answer_str = simple_digit[-1]
+                    if answer_str in self.int_output_map:
+                        parsed_labels.append(self.int_output_map[answer_str])
+                        valid_indices.append(idx)
 
         # 디버깅: 결과 출력
         print(
