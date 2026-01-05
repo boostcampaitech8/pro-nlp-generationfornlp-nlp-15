@@ -54,6 +54,7 @@ class AnswerStoppingCriteria(StoppingCriteria):
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="baseline/configs/config.yaml")
+    parser.add_argument("--ref_csv", type=str, default="batch_4_lr_5e-5_r_32_loradrop_0_neftune_5_epoch_5_BestF1.csv", help="Path to reference CSV for comparison")
     return parser.parse_args()
 
 
@@ -130,6 +131,20 @@ def main() -> None:
     test_df = pd.read_csv(config.infer.test_path)
     ids = test_df["id"].astype(str).tolist()
 
+    # Load Reference CSV if available
+    ref_answers = {}
+    if args.ref_csv and Path(args.ref_csv).exists():
+        try:
+            ref_df = pd.read_csv(args.ref_csv)
+            # Ensure ID column is string for matching
+            ref_df["id"] = ref_df["id"].astype(str)
+            ref_answers = dict(zip(ref_df["id"], ref_df["answer"]))
+            log.info(f"Loaded reference CSV: {args.ref_csv} ({len(ref_answers)} samples)")
+        except Exception as e:
+            log.warning(f"Failed to load reference CSV: {e}")
+    else:
+        log.info(f"Reference CSV not found or not provided: {args.ref_csv}")
+
     # Data Collator
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer, padding=True)
 
@@ -189,7 +204,19 @@ def main() -> None:
                     simple_digit = re.findall(r'([1-5])', response)
                     pred = simple_digit[-1] if simple_digit else "1"
                 
-                results.append({"id": ids[global_idx], "answer": pred})
+                
+                curr_id = ids[global_idx]
+                results.append({"id": curr_id, "answer": pred})
+
+                # Print comparison
+                if curr_id in ref_answers:
+                    ref_val = str(ref_answers[curr_id])
+                    is_match = (str(pred) == ref_val)
+                    match_str = "MATCH" if is_match else "MISMATCH"
+                    # Print to console directly
+                    tqdm.write(f"[ID: {curr_id}] Pred: {pred} | Ref: {ref_val} | {match_str}")
+                else:
+                    tqdm.write(f"[ID: {curr_id}] Pred: {pred} | Ref: N/A")
 
     # 6-B) Logits Mode
     else:
@@ -205,7 +232,17 @@ def main() -> None:
                 probs = torch.softmax(target_logits, dim=-1).detach().cpu().numpy()
                 pred = str(int(np.argmax(probs)) + 1)
 
-                results.append({"id": ids[i], "answer": pred})
+                curr_id = ids[i]
+                results.append({"id": curr_id, "answer": pred})
+
+                # Print comparison
+                if curr_id in ref_answers:
+                    ref_val = str(ref_answers[curr_id])
+                    is_match = (str(pred) == ref_val)
+                    match_str = "MATCH" if is_match else "MISMATCH"
+                    tqdm.write(f"[ID: {curr_id}] Pred: {pred} | Ref: {ref_val} | {match_str}")
+                else:
+                    tqdm.write(f"[ID: {curr_id}] Pred: {pred} | Ref: N/A")
 
     # 7) save
     out_path = Path(config.infer.output_path)
