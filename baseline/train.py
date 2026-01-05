@@ -42,6 +42,8 @@ def main() -> None:
             notes=wandb_conf.notes,
             override=False,
         )
+        import wandb
+        wandb.init()
 
     # 4) model + tokenizer (+ LoRA)
     log.info("Loading model/tokenizer...")
