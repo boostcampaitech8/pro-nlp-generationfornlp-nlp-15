@@ -39,6 +39,10 @@ def parse_answer_from_response(response: str, num_choices: int = 5) -> int:
     """
     LLM 응답에서 정답 숫자 추출
     
+    Args:
+        response: LLM 응답 문자열
+        num_choices: 선택지 개수 (기본 5)
+
     Returns:
         추출된 정답 (1~5), 파싱 불가 시 0
     """
