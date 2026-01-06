@@ -8,12 +8,27 @@ Solver Agent가 유효한 답(1~5)을 내지 못했을 때 호출됩니다.
 """
 import re
 import asyncio
-from typing import List, Optional
 from dataclasses import dataclass
 
 from api_inference.utils.api_client import AsyncAPIClient
-from .solver_agent import SolverResult
 
+@dataclass
+class ChoiceEvaluation:
+    """선택지 평가 결과"""
+    choice_num: int           # 선택지 번호 (1-5)
+    choice_text: str          # 선택지 텍스트
+    is_correct: bool | None  # 옳음(True), 틀림(False), 불확실(None)
+    reasoning: str            # 판단 근거
+
+
+@dataclass
+class SolverResult:
+    """Solver Agent 결과"""
+    choice_evaluations: list[ChoiceEvaluation]  # 각 선택지 평가
+    final_answer: int         # 최종 답 (1-5, 또는 0=실패)
+    confidence: str           # 확신도 (high/medium/low)
+    raw_response: str         # 원본 응답
+    needs_verification: bool  # 검증 필요 여부
 
 @dataclass
 class VerifierResult:
@@ -86,7 +101,7 @@ class VerifierAgent:
         paragraph: str,
         question: str,
         question_plus: str,
-        choices: List[str],
+        choices: list[str],
         solver_result: SolverResult,
         semaphore: asyncio.Semaphore,
     ) -> VerifierResult:
@@ -140,7 +155,7 @@ class VerifierAgent:
         paragraph: str,
         question: str,
         question_plus: str,
-        choices: List[str],
+        choices: list[str],
         semaphore: asyncio.Semaphore,
     ) -> tuple[int, str]:
         """문제를 처음부터 다시 풉니다."""
@@ -172,7 +187,7 @@ class VerifierAgent:
         paragraph: str,
         question: str,
         question_plus: str,
-        choices: List[str],
+        choices: list[str],
         solver_result: SolverResult,
         semaphore: asyncio.Semaphore,
     ) -> tuple[int, str]:
@@ -232,7 +247,7 @@ class VerifierAgent:
         self,
         re_solve_answer: int,
         review_answer: int,
-        choices: List[str]
+        choices: list[str]
     ) -> tuple[int, str, str]:
         """
         두 방식의 결과를 종합하여 최종 답을 결정합니다.

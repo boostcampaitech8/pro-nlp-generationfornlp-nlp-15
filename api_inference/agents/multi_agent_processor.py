@@ -12,12 +12,12 @@ Flow:
 """
 import re
 import asyncio
-from typing import Dict, Any, List
+from typing import Any
 from dataclasses import dataclass, asdict
 
 from api_inference.utils.api_client import AsyncAPIClient
 from api_inference.prompts import QuestionType, format_question_message, create_messages
-from .verifier_agent import VerifierAgent
+from .verifier_agent import VerifierAgent, SolverResult
 
 
 # 파싱 재시도 횟수
@@ -44,11 +44,11 @@ class MultiAgentResult:
     # 메타 정보
     question_type: str          # 문제 유형
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """딕셔너리로 변환"""
         return asdict(self)
     
-    def to_output_dict(self) -> Dict[str, Any]:
+    def to_output_dict(self) -> dict[str, Any]:
         """출력용 딕셔너리 (기존 형식과 호환)"""
         return {
             "id": self.id,
@@ -139,7 +139,7 @@ class MultiAgentProcessor:
     
     async def _run_primary_agent(
         self,
-        item: Dict[str, Any],
+        item: dict[str, Any],
         semaphore: asyncio.Semaphore,
     ) -> PrimaryAgentResult:
         """
@@ -201,7 +201,7 @@ class MultiAgentProcessor:
     
     async def process_single_item(
         self,
-        item: Dict[str, Any],
+        item: dict[str, Any],
         semaphore: asyncio.Semaphore,
     ) -> MultiAgentResult:
         """
@@ -228,7 +228,7 @@ class MultiAgentProcessor:
         verifier_result = None
         if needs_verification:
             # Verifier용 SolverResult 형태로 변환
-            from .solver_agent import SolverResult
+
             solver_like_result = SolverResult(
                 choice_evaluations=[],
                 final_answer=primary_result.answer,
@@ -274,9 +274,9 @@ class MultiAgentProcessor:
     
     async def process_batch(
         self,
-        items: List[Dict[str, Any]],
+        items: list[dict[str, Any]],
         semaphore: asyncio.Semaphore,
-    ) -> List[MultiAgentResult]:
+    ) -> list[MultiAgentResult]:
         """
         여러 문제를 병렬로 처리합니다.
         

@@ -13,6 +13,7 @@ import asyncio
 import argparse
 import logging
 from pathlib import Path
+from typing import Any
 import yaml
 from tqdm.asyncio import tqdm_asyncio
 
@@ -305,18 +306,18 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
             use_cot=use_cot,
         )
         
-        # Multi-Agent 방식으로 처리
+        # asyncio.gather 방식으로 처리
         tasks = [
             multi_agent_processor.process_single_item(item, semaphore)
             for item in test_data
         ]
         multi_agent_results = await tqdm_asyncio.gather(*tasks, desc="Multi-Agent Inference")
         
-        # 결과 변환 (기존 형식과 호환)
+        # 결과 변환
         results = [r.to_output_dict() for r in multi_agent_results]
         
         # ID 순서대로 정렬
-        id_order = {item['id']: idx for idx, item in enumerate(test_data)}
+        id_order = {item['id']: idx for idx, item in enumerate[dict[str, Any]](test_data)}
         results = sorted(results, key=lambda x: id_order[x['id']])
         
         # 결과 저장
