@@ -264,3 +264,4 @@ class VerifierAgent:
         # 둘 다 실패한 경우
         return 0, "both_failed", "low"
 
+
