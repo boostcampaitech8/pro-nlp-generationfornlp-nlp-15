@@ -25,10 +25,12 @@ from .utils.metrics import (
     print_evaluation_report,
 )
 from .utils.output_handler import save_results_with_raw, StreamingResultSaver
-from .prompts import QuestionType, format_question_message, create_messages, SYSTEM_PROMPTS
-from .agents import MultiAgentProcessor
+
 from common.utils.wandb import set_wandb_env
 from common.utils.logger import setup_logging
+
+from .prompts import QuestionType, format_question_message, create_messages
+from .agents import MultiAgentProcessor
 
 # 최대 재시도 횟수
 MAX_RETRY = 5
@@ -103,7 +105,7 @@ async def process_single_item(
         system_prompt: 시스템 프롬프트 (use_type_specific_prompt=False일 때 사용)
         semaphore: 동시 요청 제한용 세마포어
         use_type_specific_prompt: 문제 유형별 프롬프트 사용 여부
-        use_cot: CoT(Chain of Thought) 프롬프트 사용 여부
+        use_cot: CoT 프롬프트 사용 여부
     
     Returns:
         결과 딕셔너리 {'id': ..., 'answer': ..., 'raw_response': ..., 'question_type': ...}
@@ -112,7 +114,7 @@ async def process_single_item(
         # 문제 유형 가져오기
         question_type = item.get('question_type', QuestionType.DEFAULT)
         
-        # 프롬프트 생성 (유형별 또는 기본, CoT 여부)
+        # 프롬프트 생성 (유형별/기본 프롬프트, CoT 여부)
         user_message = format_question_message(
             paragraph=item['paragraph'],
             question=item['question'],
@@ -122,7 +124,7 @@ async def process_single_item(
             use_cot=use_cot
         )
         
-        # 메시지 구성 (유형별 시스템 프롬프트 또는 기본)
+        # 유형별 시스템 프롬프트 또는 기본 프롬프트
         if use_type_specific_prompt:
             messages = create_messages(user_message, question_type=question_type)
         else:
@@ -185,11 +187,11 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
     setup_logging(output_dir)
     logger = logging.getLogger(__name__)
     
-    # httpx, openai 로거 레벨 조정 (불필요한 HTTP 로그 숨김)
+    # 불필요한 HTTP 로그 숨김
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("openai").setLevel(logging.WARNING)
     
-    # mode 결정: CLI 인자 > yaml 설정 > 기본값 "test"
+    # mode 결정: 기본값 "test"
     if mode is None:
         mode = config.get('mode', 'test')
     
@@ -238,12 +240,12 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
         from .prompts import SYSTEM_PROMPTS
         system_prompt = SYSTEM_PROMPTS.get(None)
 
-    # 샘플 수 제한: CLI 옵션 > yaml 설정 (LLM 분류 전에 적용!)
+    # 데이터셋 sample size 만큼 subset 사용할건지
     effective_sample_size = sample_size or config['data'].get('sample_size')
     if effective_sample_size is not None and effective_sample_size > 0:
         print(f"[Sample Mode] Will use {effective_sample_size} samples")
 
-    # 유형별 프롬프트 사용 여부 (LLM 분류 전에 읽어야 함)
+    # 유형별 프롬프트 사용 여부
     use_type_specific_prompt = config['inference'].get('use_type_specific_prompt', True)
     
     # 문제 유형 분류 투표 횟수 (다수결 방식)
@@ -276,7 +278,7 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
             print(f"  {qtype}: {count}개")
         print("========================")
     
-    # 시스템 프롬프트 (유형별 프롬프트 미사용 시에만 적용)
+    # 시스템 프롬프트
     system_prompt = config['inference'].get(
         'system_prompt'
     )
@@ -284,7 +286,7 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
     # CoT (Chain of Thought) 프롬프트 사용 여부
     use_cot = config['inference'].get('use_cot', False)
     
-    # Multi-Agent 모드 사용 여부
+    # Multi-Agent 모드 사용 여부 (현재는 검증 Agent 사용 여부)
     use_multi_agent = config['inference'].get('use_multi_agent', False)
     
     # 배치 저장 크기 (기본값: 50)
@@ -380,9 +382,6 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
         
         # WandB에 기록
         if wandb_run is not None:
-            import wandb
-            
-            # Overall metrics
             wandb.log({
                 'eval/accuracy': overall.get('accuracy', 0),
                 'eval/f1_macro': overall.get('f1_macro', 0),
@@ -392,7 +391,7 @@ async def run_api_inference_async(config_path: str, mode: str | None = None, sam
                 'eval/failed_parse': failed_count,
             })
             
-            # 유형별 metrics
+            # 문제 유형별 metrics
             for q_type in QuestionType:
                 type_metrics = metrics_by_type.get(q_type.value, {})
                 if type_metrics.get('total', 0) > 0:
@@ -441,7 +440,7 @@ def main():
         help="inference.yaml 설정 파일 경로"
     )
     
-    # --train / --test 선택적 (지정하면 yaml 설정 오버라이드)
+    # --train / --test 선택
     mode_group = parser.add_mutually_exclusive_group(required=False)
     mode_group.add_argument(
         "--train",
@@ -463,7 +462,6 @@ def main():
     
     args = parser.parse_args()
     
-    # CLI에서 모드 지정했으면 사용, 아니면 None (yaml에서 읽음)
     mode = None
     if args.train:
         mode = "train"
