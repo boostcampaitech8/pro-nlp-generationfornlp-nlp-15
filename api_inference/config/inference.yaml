@@ -34,10 +34,6 @@ inference:
   
   # Multi-Agent 설정
   use_multi_agent: false                 # Multi-Agent 모드 사용 여부 (true: Solver+Verifier, false: 기존 방식)
-  # Multi-Agent 모드 동작:
-  #   1. Solver Agent: 각 선택지를 독립적으로 평가하여 답 결정
-  #   2. 답이 유효하지 않으면 (1~5 아닐 때) Verifier Agent 호출
-  #   3. Verifier: 재풀이 + CoT 검토 후 최종 답 결정
 
 wandb:
   project: "koreasat_jisoo_prompt"

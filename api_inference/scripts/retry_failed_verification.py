@@ -25,7 +25,8 @@ from tqdm.asyncio import tqdm
 logging.basicConfig(level=logging.WARNING)  # WARNING 이상만 출력
 logger = logging.getLogger(__name__)
 
-from api_inference.api_inference_agent import Verifier80BAgent, parse_answer_from_response
+from api_inference.agents.verifier_80b_agent import Verifier80BAgent
+from api_inference.utils.answer_parser import parse_answer_from_response
 
 
 def parse_problems_from_csv(problems_str: str) -> dict:
@@ -230,15 +231,11 @@ async def main():
     # 결과를 딕셔너리로 변환
     retry_dict = {r['id']: r for r in retry_results}
     
-    # answer 컬럼을 문자열 타입으로 변환 (타입 불일치 경고 방지)
-    if 'answer' in result_df.columns:
-        result_df['answer'] = result_df['answer'].astype(str)
-    
     # 기존 결과 업데이트
     for idx, row in result_df.iterrows():
         if row['id'] in retry_dict:
             retry_result = retry_dict[row['id']]
-            result_df.at[idx, 'answer'] = str(retry_result['answer'])
+            result_df.at[idx, 'answer'] = retry_result['answer']
             result_df.at[idx, 'raw_response'] = retry_result['raw_response']
             # question_type도 업데이트 (없으면 추가)
             if 'question_type' in result_df.columns:
@@ -248,20 +245,11 @@ async def main():
     output_path = Path(args.output_csv)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # 재검증된 문제들만 별도로 저장 (디버깅/확인용)
-    retried_only_df = result_df[result_df['id'].isin(failed_ids)].copy()
-    retried_only_path = output_path.parent / f"{output_path.stem}_retried_only.csv"
-    retried_only_df.to_csv(retried_only_path, index=False, encoding='utf-8-sig')
-    
-    # 재검증된 문제들만 간단 버전 저장
-    retried_simple_path = output_path.parent / f"output_{output_path.stem.replace('raw_', '')}_retried_only.csv"
-    retried_only_df[['id', 'answer']].to_csv(retried_simple_path, index=False)
-    
-    # output.csv 저장 (id, answer만) - 전체 파일
+    # output.csv 저장 (id, answer만)
     output_simple_path = output_path.parent / f"output_{output_path.stem.replace('raw_', '')}.csv"
     result_df[['id', 'answer']].to_csv(output_simple_path, index=False)
     
-    # output_raw.csv 저장 - 전체 파일
+    # output_raw.csv 저장
     result_df.to_csv(output_path, index=False, encoding='utf-8-sig')
 
 

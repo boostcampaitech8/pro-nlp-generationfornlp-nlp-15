@@ -26,286 +26,14 @@ from .utils.metrics import (
     print_evaluation_report,
 )
 from .utils.output_handler import save_results_with_raw, StreamingResultSaver
-from .prompts import QuestionType, format_question_message, create_messages, SYSTEM_PROMPTS
-from .agents.multi_agent_processor import MultiAgentProcessor
+from .prompts import QuestionType, SYSTEM_PROMPTS
+
+from .agents.primary_agent import PrimaryAgent
+from .agents.verifier_80b_agent import Verifier80BAgent
+from .agents.multi_agent_processor_80b import MultiAgentProcessor80B
+
 from common.utils.wandb import set_wandb_env
 from common.utils.logger import setup_logging
-
-# 최대 재시도 횟수
-MAX_RETRY = 5
-
-
-def parse_answer_from_response(response: str, num_choices: int = 5) -> int:
-    """
-    LLM 응답에서 정답 숫자 추출
-    
-    Args:
-        response: LLM 응답 문자열
-        num_choices: 선택지 개수 (기본 5)
-
-    Returns:
-        추출된 정답 (1~5), 파싱 불가 시 0
-    """
-    if not response:
-        return 0
-    
-    response = response.strip()
-    
-    # 패턴 1: "정답: X" 또는 "정답 X" 형태
-    pattern1 = r'정답\s*[:\s]\s*(\d)'
-    match1 = re.search(pattern1, response)
-    if match1:
-        answer = int(match1.group(1))
-        if 1 <= answer <= num_choices:
-            return answer
-    
-    # 패턴 2: 응답 끝부분의 숫자
-    pattern2 = r'(\d)\s*$'
-    match2 = re.search(pattern2, response)
-    if match2:
-        answer = int(match2.group(1))
-        if 1 <= answer <= num_choices:
-            return answer
-    
-    # 패턴 3: 응답 전체에서 마지막으로 나타나는 유효 숫자
-    valid_numbers = [str(i) for i in range(1, num_choices + 1)]
-    for char in reversed(response):
-        if char in valid_numbers:
-            return int(char)
-    
-    return 0
-
-
-class Verifier80BAgent:
-    """
-    80B 모델을 사용한 Verifier Agent
-    """
-    def __init__(self, config: dict):
-        verifier_config = config.get('verifier_80b', {})
-        from openai import AsyncOpenAI
-        
-        self.client = AsyncOpenAI(
-            base_url=verifier_config.get('base_url'),
-            api_key=verifier_config.get('api_key', 'EMPTY'),
-            timeout=verifier_config.get('timeout', 180),
-            max_retries=0,  # 수동 재시도 로직 사용
-        )
-        self.model_name = verifier_config.get('model_name', 'local_model')
-        self.temperature = verifier_config.get('temperature', 0.0)
-        self.max_tokens = verifier_config.get('max_tokens', 2048)
-        
-        self.system_prompt = """당신은 수능/공무원 시험 문제를 검토하는 전문가입니다.
-
-[작성 규칙]
-1. 각 선택지 검토는 2-3줄로 간결하게 작성하세요. 같은 내용을 반복하지 마세요.
-2. 핵심 논리와 근거만 제시하세요. 불필요한 반복 설명을 피하세요.
-3. 반드시 응답의 마지막 줄에 "정답: (숫자)" 형식으로 답을 출력하세요.
-
-다른 모델의 추론 과정을 검토하고, 오류가 있다면 간결하게 지적하여 올바른 답을 제시해주세요."""
-        
-        self.user_prompt_template = """[지문]
-{paragraph}
-
-[질문]
-{question}
-{question_plus}
-
-[선택지]
-{choices}
-
-[1차 모델의 추론]
-{primary_cot}
-
-위 추론에 대해 검토해주세요:
-1. 논리적 오류나 사실 오류가 있는지 확인하세요.
-2. 누락된 정보나 잘못된 판단이 있는지 확인하세요.
-3. 각 선택지에 대한 분석이 올바른지 검토하세요 (각 선택지는 2-3줄로 간결히).
-4. 최종적으로 올바른 답을 제시하세요.
-
-검토 결과를 간결하고 핵심적으로 서술하고, 반드시 마지막 줄에 "정답: (숫자)" 형식으로 답하세요."""
-    
-    async def verify(
-        self,
-        paragraph: str,
-        question: str,
-        question_plus: str,
-        choices: list,
-        primary_cot: str,
-        semaphore: asyncio.Semaphore,
-        max_retries: int = 3,
-    ) -> tuple[int, str]:
-        """
-        80B 모델로 검증합니다.
-        
-        Returns:
-            (answer: int, response: str)
-        """
-        async with semaphore:
-            # 선택지 텍스트 구성
-            choices_text = "\n".join([f"{i+1}. {c}" for i, c in enumerate(choices)])
-            
-            # question_plus 처리
-            if question_plus and str(question_plus).strip() not in ['', 'nan', 'None']:
-                question_plus_text = f"\n<보기>\n{question_plus}"
-            else:
-                question_plus_text = ""
-            
-            # 프롬프트 구성
-            user_message = self.user_prompt_template.format(
-                paragraph=paragraph,
-                question=question,
-                question_plus=question_plus_text,
-                choices=choices_text,
-                primary_cot=primary_cot
-            )
-            
-            messages = [
-                {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": user_message}
-            ]
-            
-            # 재시도 로직
-            last_error = None
-            for attempt in range(1, max_retries + 1):
-                try:
-                    response = await self.client.chat.completions.create(
-                        model=self.model_name,
-                        messages=messages,
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens,
-                    )
-                    
-                    content = response.choices[0].message.content
-                    answer = parse_answer_from_response(content, len(choices))
-                    return answer, content
-                    
-                except Exception as e:
-                    last_error = e
-                    if attempt < max_retries:
-                        await asyncio.sleep(2 ** attempt)  # 지수 백오프
-                        continue
-                    else:
-                        # 모든 재시도 실패
-                        error_msg = f"Error ({type(e).__name__}): {str(e)}"
-                        return 0, error_msg
-            
-            return 0, f"Error: {last_error}"
-
-
-async def process_single_item_with_80b(
-    primary_client: AsyncAPIClient,
-    verifier_80b: Verifier80BAgent,
-    item: dict,
-    system_prompt: str,
-    semaphore: asyncio.Semaphore,
-    use_type_specific_prompt: bool,
-    use_cot: bool,
-    verify_all: bool = False,
-    verify_threshold: float = None,
-) -> dict:
-    """
-    Multi-Agent 방식으로 단일 문제 처리
-    
-    Args:
-        verify_all: True면 모든 문제를 80B로 검증, False면 조건부
-        verify_threshold: 확신도 임계값 (None이면 파싱 실패 시만)
-    """
-    async with semaphore:
-        # 1차 Agent: 기존 CoT 방식
-        question_type = item.get('question_type', QuestionType.DEFAULT)
-        
-        user_message = format_question_message(
-            paragraph=item['paragraph'],
-            question=item['question'],
-            question_plus=item.get('question_plus', ''),
-            choices_list=item['choices'],
-            question_type=question_type if use_type_specific_prompt else QuestionType.DEFAULT,
-            use_cot=use_cot
-        )
-        
-        if use_type_specific_prompt:
-            messages = create_messages(user_message, question_type=question_type)
-        else:
-            messages = create_messages(user_message, system_prompt)
-        
-        primary_response = ""
-        primary_answer = 0
-        all_responses = []
-        
-        # 최대 MAX_RETRY 횟수만큼 시도
-        for attempt in range(1, MAX_RETRY + 1):
-            try:
-                response = await primary_client.chat_completion(messages=messages)
-                all_responses.append(f"[Attempt {attempt}] {response}" if response else f"[Attempt {attempt}] NULL")
-                
-                primary_answer = parse_answer_from_response(response, len(item['choices']))
-                
-                if primary_answer > 0:
-                    primary_response = response
-                    break
-                    
-            except Exception as e:
-                all_responses.append(f"[Attempt {attempt}] Error: {str(e)}")
-        
-        if primary_answer == 0:
-            primary_response = " | ".join(all_responses)
-        
-        # 80B Verifier 호출 여부 결정
-        num_choices = len(item['choices'])
-        needs_verification = False
-        
-        if verify_all:
-            # 모든 문제 검증
-            needs_verification = True
-        elif verify_threshold is not None:
-            # 확신도 기반 (logit 기반은 추후 구현 가능)
-            # 현재는 파싱 실패 시만
-            needs_verification = (primary_answer < 1 or primary_answer > num_choices)
-        else:
-            # 기본: 파싱 실패 시만
-            needs_verification = (primary_answer < 1 or primary_answer > num_choices)
-        
-        # 80B Verifier 호출
-        verifier_answer = 0
-        verifier_response = ""
-        verifier_used = False
-        
-        if needs_verification:
-            verifier_used = True
-            verifier_answer, verifier_response = await verifier_80b.verify(
-                paragraph=item['paragraph'],
-                question=item['question'],
-                question_plus=item.get('question_plus', ''),
-                choices=item['choices'],
-                primary_cot=primary_response,
-                semaphore=semaphore,
-            )
-        
-        # 최종 답 결정
-        if verifier_used and verifier_answer > 0:
-            final_answer = verifier_answer
-        else:
-            final_answer = primary_answer
-        
-        # 결과 구성
-        question_type_str = question_type.value if hasattr(question_type, 'value') else str(question_type)
-        
-        # raw_response 구성
-        raw_response = f"[Primary Agent]\n{primary_response}"
-        if verifier_used:
-            raw_response += f"\n\n[80B Verifier]\n{verifier_response}"
-        
-        return {
-            "id": item['id'],
-            "answer": str(final_answer) if final_answer > 0 else "0",
-            "raw_response": raw_response,
-            "question_type": question_type_str,
-            "multi_agent_info": {
-                "primary_answer": primary_answer,
-                "verifier_used": verifier_used,
-                "verifier_answer": verifier_answer if verifier_used else None,
-            }
-        }
 
 
 async def run_api_inference_agent_async(
@@ -391,13 +119,7 @@ async def run_api_inference_agent_async(
     
     verifier_80b = Verifier80BAgent(config)
     print(f"\n[80B Verifier] Base URL: {config['verifier_80b'].get('base_url')}")
-    
-    # 연결 테스트
-    try:
-        # 간단한 연결 테스트는 생략 (실제 호출 시 에러 처리)
-        print("[80B Verifier] Ready")
-    except Exception as e:
-        logger.warning(f"80B Verifier connection test failed: {e}")
+    print("[80B Verifier] Ready")
     
     # 데이터 로드
     if is_train_mode:
@@ -470,22 +192,28 @@ async def run_api_inference_agent_async(
     print(f"  80B Verifier: verify_all={verify_all}, threshold={verify_threshold}")
     print(f"  Max concurrent: {max_concurrent}")
     
+    # Primary Agent 초기화
+    primary_agent = PrimaryAgent(
+        client=primary_client,
+        system_prompt=system_prompt,
+        use_type_specific_prompt=use_type_specific_prompt,
+        use_cot=use_cot,
+    )
+    
+    # Multi-Agent Processor 초기화
+    processor = MultiAgentProcessor80B(
+        primary_agent=primary_agent,
+        verifier_80b=verifier_80b,
+        verify_all=verify_all,
+        verify_threshold=verify_threshold,
+    )
+    
     # 문제 처리
     if use_streaming_save:
         saver = StreamingResultSaver(config['data']['output_dir'], batch_size=save_batch_size)
         
         async def process_and_save(item):
-            result = await process_single_item_with_80b(
-                primary_client,
-                verifier_80b,
-                item,
-                system_prompt,
-                semaphore,
-                use_type_specific_prompt,
-                use_cot,
-                verify_all,
-                verify_threshold,
-            )
+            result = await processor.process_single_item(item, semaphore)
             saver.add_result(result)
             return result
         
@@ -495,17 +223,7 @@ async def run_api_inference_agent_async(
         output_path, raw_output_path = saver.finalize(type_stats)
     else:
         tasks = [
-            process_single_item_with_80b(
-                primary_client,
-                verifier_80b,
-                item,
-                system_prompt,
-                semaphore,
-                use_type_specific_prompt,
-                use_cot,
-                verify_all,
-                verify_threshold,
-            )
+            processor.process_single_item(item, semaphore)
             for item in test_data
         ]
         results = await tqdm_asyncio.gather(*tasks, desc="Multi-Agent Inference")
