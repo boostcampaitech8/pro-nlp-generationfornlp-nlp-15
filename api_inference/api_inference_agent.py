@@ -1,5 +1,5 @@
 """
-Multi-Agent 추론 스크립트 (80B Verifier 포함)
+Multi-Agent 추론 스크립트
 - 1차 Agent: 기존 CoT 방식으로 문제 풀이
 - 2차 Verifier: 80B 모델로 검증 (모든 문제 또는 조건부)
 - YAML 설정 기반
@@ -43,18 +43,18 @@ async def run_api_inference_agent_async(
     input_csv: str | None = None
 ) -> tuple:
     """
-    Multi-Agent 방식으로 수능 문제 추론 실행 (80B Verifier 포함)
+    Multi-Agent 방식으로 수능 문제 추론 실행
     
     Args:
         config_path: inference.yaml 설정 파일 경로
         mode: "train" 또는 "test" (None이면 yaml에서 읽음)
         sample_size: 테스트용 샘플 개수 제한
-        input_csv: 기존 CSV 파일 경로 (None이면 yaml에서 읽음, 있으면 80B Verifier만 실행)
+        input_csv: 기존 CSV 파일 경로 (None이면 yaml에서 읽고, 있다면 80B Verifier만 실행)
     
     Returns:
         (output 파일 경로, raw output 파일 경로) 튜플
     """
-    # 설정 로드
+    ### 1. utils 설정 세팅
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
     
@@ -108,12 +108,13 @@ async def run_api_inference_agent_async(
         )
         logger.info(f"WandB initialized: {wandb_config.get('project')}/{wandb_config.get('name')}")
     
+    ### 2. 추론 LLM 설정 세팅
     # 1차 Agent 클라이언트 초기화
     primary_client = AsyncAPIClient(config)
     max_concurrent = config['inference'].get('max_concurrent', 5)
     semaphore = asyncio.Semaphore(max_concurrent)
     
-    # 80B Verifier 초기화
+    # 2차 80B Verifier 클라이언트 초기화
     if 'verifier_80b' not in config:
         raise ValueError("verifier_80b configuration is required in yaml file")
     
@@ -192,6 +193,7 @@ async def run_api_inference_agent_async(
     print(f"  80B Verifier: verify_all={verify_all}, threshold={verify_threshold}")
     print(f"  Max concurrent: {max_concurrent}")
     
+    ### 3. Multi-Agent 설정 세팅
     # Primary Agent 초기화
     primary_agent = PrimaryAgent(
         client=primary_client,
@@ -302,11 +304,11 @@ async def run_api_inference_agent_from_csv_async(
     sample_size: int | None = None
 ) -> tuple:
     """
-    기존 CSV 파일에서 32B CoT 결과를 읽어서 80B Verifier만 실행
+    기존 CSV 파일에서 CoT 결과를 읽어서 80B Verifier만 실행
     
     Args:
         config_path: inference.yaml 설정 파일 경로
-        input_csv: 기존 32B CoT 결과가 있는 CSV 파일 경로
+        input_csv: 기존 CoT 결과가 있는 CSV 파일 경로
         sample_size: 테스트용 샘플 개수 제한
     
     Returns:
@@ -328,7 +330,7 @@ async def run_api_inference_agent_from_csv_async(
     print(f"\n[Mode] 80B Verifier Only (from existing CSV)")
     print(f"  Input CSV: {input_csv}")
     
-    # 80B Verifier 초기화
+    # 80B Verifier 클라이언트 초기화
     if 'verifier_80b' not in config:
         raise ValueError("verifier_80b configuration is required in yaml file")
     
