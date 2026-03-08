@@ -1,29 +1,39 @@
 # 수능형 문제 풀이 모델 생성 Project
 
----
+## 구조
 
-## 프로젝트 폴더 구조
+- `baseline/` : 실행 가능한 “실험 패키지”
+  - `main.py` 학습 엔트리포인트
+  - `inference.py` 추론 엔트리포인트(있는 경우)
+  - `configs/` pydantic schema + yaml 로더 + `config.yaml`
+  - `models/` 모델/토크나이저 로더
+  - `trainer/` SFT runner, metrics
 
-```text
-koreasat_project/
-├── configs/
-│   └── train_config.yaml        # 모델, LoRA, 학습 하이퍼파라미터 통합 관리
-│
-├── data/
-│   ├── train.csv                # 학습용 데이터 (id, paragraph, problems)
-│   └── test.csv                 # 추론용 데이터 (id, paragraph, problems)
-│
-├── outputs/
-│   └── final_adapter/           # 학습 완료 후 생성되는 최종 LoRA 가중치 및 설정
-│
-├── data_utils.py                # 데이터 로드, literal_eval 파싱, 동적 프롬프트 생성
-├── model_utils.py               # 모델/토크나이저 로드, Chat Template, 프롬프트 상수
-├── trainer.py                   # SFTTrainer 실행, Completion Only 학습 설정
-├── metrics.py                   # Logit 비교 기반 정답 토큰 Accuracy 계산
-├── main.py                      # 학습 실행 엔트리 포인트
-├── inference.py                 # 추론 실행 및 output.csv 생성
-└── requirements.txt             # 필수 라이브러리 목록
-````
+- `common/` : 여러 실험에서 공유하는 “라이브러리”
+  - `data/` CSV → examples → messages → HF Dataset/tokenize
+  - `prompts/` system prompt / formatter / templates
+  - `tokenization/` chat_template 등
+  - `utils/` logger, wandb helper
+
+- `outputs/` : 실험 결과 저장(output_dir 예시)
+
+## 실행 (uv, 루트에서)
+
+파일 직접 실행하지 말고, 항상 패키지 모듈로 실행합니다.
+
+학습:
+```bash
+uv run python -m baseline.train --config baseline/configs/config.yaml
+```
+추론(있는 경우):
+```bash
+uv run python -m baseline.inference --config baseline/configs/config.yaml
+```
+
+설정(config)
+	•	코드 스키마: baseline/configs/schema.py
+	•	로더: baseline/configs/load.py
+	•	실행 설정: baseline/configs/config.yaml
 
 ---
 
